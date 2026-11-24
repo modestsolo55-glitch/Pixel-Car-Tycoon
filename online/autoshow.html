@@ -1,0 +1,275 @@
+<title>AutoTycoon Autoshow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: Nacht-Autohalle – Bühne oben, darunter Ausstellen + Rangliste als Kartenraster. Bewusst nur ein (dunkles) Erscheinungsbild. */
+:root {
+  --bg: #0d0f1a;          /* Hallenboden bei Nacht */
+  --panel: #1a1c2c;       /* Podeste und Karten */
+  --panel2: #262b44;
+  --line: #05060c;        /* Pixel-Kontur */
+  --fg: #e8ecf4;
+  --muted: #94a0bc;
+  --gold: #ffcd75;        /* Pokal / Akzent */
+  --neon: #ff4bd0;        /* Stimmen */
+  --ok: #a7f070;
+  --bad: #ff7b8a;
+  --f-display: 'Pixelify Sans', 'Courier New', monospace;
+  --f-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 48px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-wrap: balance; margin: 0; letter-spacing: .5px; }
+h2 { font-size: 22px; color: var(--gold); }
+.lbl { font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- Bühne ---------- */
+.stage { position: relative; overflow: hidden; margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 34px max(16px, env(safe-area-inset-left, 0px)) 26px;
+  background: radial-gradient(ellipse 70% 55% at 50% 100%, #2b3158 0%, #14172a 55%, var(--bg) 100%); border-bottom: 4px solid var(--line); }
+.beam { position: absolute; top: -40px; width: 140px; height: 360px; transform-origin: top center; opacity: .22; filter: blur(2px); pointer-events: none;
+  background: linear-gradient(to bottom, var(--c), transparent 85%); clip-path: polygon(45% 0, 55% 0, 100% 100%, 0 100%); }
+.beam.b1 { left: 12%; --c: #ff4bd0; animation: sweep 7s ease-in-out infinite; }
+.beam.b2 { left: 46%; --c: #73eff7; animation: sweep 9s ease-in-out infinite reverse; }
+.beam.b3 { right: 10%; --c: #ffcd75; animation: sweep 8s ease-in-out infinite; animation-delay: -3s; }
+@keyframes sweep { 0%,100% { transform: rotate(-18deg); } 50% { transform: rotate(18deg); } }
+.stage-in { position: relative; max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: center; }
+.stage h1 { font-size: clamp(30px, 6vw, 52px); color: var(--gold); text-shadow: 4px 4px 0 var(--line); line-height: 1.05; }
+.stage p { color: #c8cee0; max-width: 46ch; margin: 10px 0 0; }
+.podium { position: relative; text-align: center; }
+.podium img { width: 100%; max-width: 520px; image-rendering: pixelated; display: block; margin: 0 auto; animation: hover 4s ease-in-out infinite; }
+.podium .turntable { height: 22px; margin: -8px auto 0; max-width: 460px; border-radius: 50%; background: radial-gradient(ellipse, #4a5280, #22263a 70%); box-shadow: 0 0 0 3px var(--line); }
+.podium .cap { margin-top: 10px; font-family: var(--f-display); font-size: 18px; color: var(--gold); }
+.podium .cap small { display: block; font-family: var(--f-body); font-size: 13px; color: var(--muted); }
+@keyframes hover { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.empty-stage { font-family: var(--f-display); color: var(--muted); padding: 50px 10px; border: 3px dashed #333c57; }
+
+/* ---------- Bedienteile ---------- */
+.row { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.box { background: var(--panel); padding: 16px; box-shadow: 0 0 0 4px var(--line); display: flex; flex-direction: column; gap: 10px; }
+textarea { width: 100%; min-height: 96px; resize: vertical; background: var(--bg); color: var(--fg); border: 0; box-shadow: 0 0 0 3px #333c57; padding: 8px; font: 12px/1.4 ui-monospace, Consolas, monospace; }
+textarea:focus-visible, button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+button { font-family: var(--f-display); font-size: 16px; color: #fff; background: #3b5dc9; border: 0; padding: 9px 14px; cursor: pointer;
+  box-shadow: inset -3px -3px 0 rgba(0,0,0,.35), inset 3px 3px 0 rgba(255,255,255,.22), 0 0 0 3px var(--line); transition: transform .08s; }
+button:hover { transform: translateY(-1px); }
+button:disabled { background: #3a3f52; color: #7d8296; cursor: not-allowed; transform: none; }
+button.go { background: #38b764; }
+button.vote { background: var(--panel2); font-size: 15px; padding: 6px 12px; }
+button.vote.on { background: var(--neon); }
+.preview { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: center; background: var(--panel2); padding: 8px; }
+.preview img { width: 120px; image-rendering: pixelated; }
+.msg { font-size: 14px; }
+.msg.ok { color: var(--ok); } .msg.bad { color: var(--bad); }
+ol.how { margin: 0; padding-left: 20px; color: #c8cee0; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--bg); padding: 1px 5px; }
+
+/* ---------- Rangliste ---------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.card { background: var(--panel); box-shadow: 0 0 0 4px var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; animation: up .35s ease-out both; }
+.card.mine { box-shadow: 0 0 0 4px var(--line), inset 0 0 0 2px var(--gold); }
+.card .top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.card .place { font-family: var(--f-display); font-size: 22px; color: var(--gold); min-width: 2.2ch; }
+.card .name { font-family: var(--f-display); font-size: 18px; overflow-wrap: anywhere; }
+.card .shot { background: radial-gradient(ellipse at 50% 85%, #3a4060, #22263a 65%); padding: 6px 0; }
+.card .shot img { width: 100%; image-rendering: pixelated; display: block; }
+.card .by { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-variant-numeric: tabular-nums; }
+.specs div { background: var(--bg); padding: 4px 6px; }
+.specs b { display: block; font-size: 15px; color: var(--fg); font-weight: 600; }
+.specs span { font-size: 11px; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
+.card .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.likes { font-family: var(--f-display); font-size: 18px; color: var(--neon); font-variant-numeric: tabular-nums; }
+.tag { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; background: var(--gold); color: var(--line); padding: 1px 6px; font-weight: 600; }
+.note { color: var(--muted); font-size: 14px; }
+.empty { background: var(--panel); box-shadow: 0 0 0 4px var(--line); padding: 26px; color: #c8cee0; }
+.empty h3 { color: var(--gold); font-size: 20px; margin-bottom: 6px; }
+@keyframes up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 760px) {
+  .stage-in, .row { grid-template-columns: minmax(0, 1fr); }
+  .beam { width: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="stage" id="stage">
+  <div class="beam b1"></div><div class="beam b2"></div><div class="beam b3"></div>
+  <div class="stage-in">
+    <div>
+      <div class="lbl">AutoTycoon · Online</div>
+      <h1>Autoshow</h1>
+      <p>Stell dein bestes Auto aus AutoTycoon aus und stimm für die Autos der anderen ab. Das Auto mit den meisten Stimmen steht oben auf der Bühne.</p>
+    </div>
+    <div class="podium" id="podium"><div class="empty-stage">Die Bühne wartet auf das erste Auto.</div></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="row">
+    <section class="box" aria-labelledby="h-enter">
+      <h2 id="h-enter">Auto ausstellen</h2>
+      <ol class="how">
+        <li>Im Spiel: <b>Autoshow</b> öffnen, Auto wählen.</li>
+        <li>Auf <b>Code für Online-Show kopieren</b> klicken.</li>
+        <li>Code hier einfügen und ausstellen.</li>
+      </ol>
+      <label class="lbl" for="code">Code aus dem Spiel</label>
+      <textarea id="code" placeholder="ATSHOW1:…" spellcheck="false"></textarea>
+      <div id="preview" hidden></div>
+      <button class="go" id="enter" disabled>Ausstellen</button>
+      <div class="msg" id="msg" role="status"></div>
+      <div class="note">Pro Person steht ein Auto in der Show. Ein neuer Code ersetzt dein bisheriges Auto, die Stimmen bleiben dabei nicht erhalten.</div>
+    </section>
+    <section aria-labelledby="h-rank" style="display:flex;flex-direction:column;gap:12px;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <h2 id="h-rank">Rangliste</h2>
+        <div class="note" id="count"></div>
+      </div>
+      <div class="note" id="status">Die Show wird geladen…</div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const state = { db: null, user: null, me: null, canWrite: true, builds: new Map(), votes: new Map(), parsed: null, writeLocked: false };
+
+  // ---------- Code aus dem Spiel prüfen (fremde Eingabe: streng validieren) ----------
+  function parseCode(raw) {
+    const t = String(raw || '').trim();
+    if (!t) return { err: '' };
+    if (!t.startsWith('ATSHOW1:')) return { err: 'Das ist kein Autoshow-Code. Er beginnt mit „ATSHOW1:“.' };
+    let o;
+    try { o = JSON.parse(decodeURIComponent(escape(atob(t.slice(8))))); } catch (e) { return { err: 'Der Code ist unvollständig. Kopiere ihn im Spiel nochmals.' }; }
+    const str = (v, n) => String(v == null ? '' : v).slice(0, n);
+    const num = (v, a, b) => { const x = Number(v); return Number.isFinite(x) ? Math.min(b, Math.max(a, x)) : a; };
+    const img = String(o.img || '');
+    if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > 180000) return { err: 'Das Autobild im Code fehlt oder ist zu gross.' };
+    const b = { name: str(o.name, 30) || 'Ohne Namen', company: str(o.company, 30), nick: str(o.nick, 24) || 'Anonym', cls: str(o.cls, 20),
+      ps: Math.round(num(o.ps, 0, 5000)), t14: Math.round(num(o.t14, 3, 40) * 100) / 100, style: Math.round(num(o.style, 0, 100)), img };
+    return { b };
+  }
+  const CLS = { small: 'Kleinwagen', family: 'Familienauto', suv: 'SUV', sport: 'Sportcoupé', super: 'Supersportwagen', hyper: 'Hypercar' };
+
+  function renderPreview() {
+    const p = state.parsed, box = $('#preview'), msg = $('#msg');
+    box.textContent = '';
+    if (!p || !p.b) { box.hidden = true; $('#enter').disabled = true; msg.className = 'msg bad'; msg.textContent = p && p.err ? p.err : ''; return; }
+    box.hidden = false; msg.textContent = ''; msg.className = 'msg';
+    const wrap = document.createElement('div'); wrap.className = 'preview';
+    const im = document.createElement('img'); im.src = p.b.img; im.alt = p.b.name;
+    const tx = document.createElement('div');
+    const n = document.createElement('div'); n.style.cssText = 'font-family:var(--f-display);font-size:17px'; n.textContent = p.b.name;
+    const d = document.createElement('div'); d.className = 'note'; d.textContent = `${p.b.ps} PS · 1/4 Meile ${p.b.t14.toFixed(2)} s · Stil ${p.b.style}`;
+    tx.append(n, d); wrap.append(im, tx); box.append(wrap);
+    $('#enter').disabled = !state.db || !state.me || state.writeLocked;
+  }
+  $('#code').addEventListener('input', e => { state.parsed = parseCode(e.target.value); renderPreview(); });
+
+  // ---------- Ausstellen ----------
+  $('#enter').addEventListener('click', async () => {
+    const p = state.parsed; if (!p || !p.b || !state.db || !state.me) return;
+    const btn = $('#enter'), msg = $('#msg');
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Wird ausgestellt…';
+    try {
+      await state.db.doc('builds/' + state.me).set(Object.assign({}, p.b, { updated: Date.now() }));
+      msg.className = 'msg ok'; msg.textContent = `„${p.b.name}“ steht jetzt in der Show.`;
+      $('#code').value = ''; state.parsed = null; $('#preview').hidden = true;
+    } catch (e) {
+      msg.className = 'msg bad';
+      if (e && e.code === 'invalid_argument') { state.writeLocked = true; msg.textContent = 'Du kannst hier nur zuschauen. Bitte die Person, die dir den Link geschickt hat, dich als „Mitwirkende/r“ freizugeben.'; }
+      else if (e && e.code === 'quota_exceeded') msg.textContent = 'Die Show ist voll. Es können gerade keine Autos mehr dazukommen.';
+      else msg.textContent = 'Das hat nicht geklappt. Versuch es gleich nochmals.';
+      btn.disabled = state.writeLocked;
+    }
+  });
+
+  // ---------- Abstimmen ----------
+  async function toggleVote(buildId) {
+    if (!state.db || !state.me || buildId === state.me || state.writeLocked) return;
+    const mine = Object.assign({}, (state.votes.get(state.me) || {}).picks || {});
+    if (mine[buildId]) delete mine[buildId]; else mine[buildId] = true;
+    try { await state.db.doc('votes/' + state.me).set({ picks: mine, updated: Date.now() }); }
+    catch (e) {
+      if (e && e.code === 'invalid_argument') { state.writeLocked = true; render(); $('#status').textContent = 'Du kannst hier nur zuschauen. Zum Abstimmen brauchst du Mitwirkenden-Rechte.'; }
+    }
+  }
+
+  // ---------- Darstellung ----------
+  function likesOf(id) { let n = 0; for (const [voter, v] of state.votes) if (voter !== id && v.picks && v.picks[id]) n++; return n; }
+  function render() {
+    const list = [...state.builds.entries()].map(([id, b]) => ({ id, b, likes: likesOf(id) }))
+      .sort((x, y) => y.likes - x.likes || (y.b.updated || 0) - (x.b.updated || 0));
+    const myPicks = (state.votes.get(state.me) || {}).picks || {};
+    $('#count').textContent = list.length ? `${list.length} ${list.length === 1 ? 'Auto' : 'Autos'} · ${state.votes.size} ${state.votes.size === 1 ? 'Person hat' : 'Personen haben'} abgestimmt` : '';
+    const grid = $('#grid'); grid.textContent = '';
+    if (!list.length) {
+      const e = document.createElement('div'); e.className = 'empty'; e.style.gridColumn = '1 / -1';
+      const h = document.createElement('h3'); h.textContent = 'Noch keine Autos in der Show';
+      const p = document.createElement('div'); p.textContent = 'Das erste Auto, das jemand ausstellt, kommt direkt auf die Bühne. Den Code dafür bekommst du im Spiel unter Autoshow.';
+      e.append(h, p); grid.append(e);
+    }
+    list.forEach((it, i) => {
+      const b = it.b, c = document.createElement('article'); c.className = 'card' + (it.id === state.me ? ' mine' : ''); c.style.animationDelay = Math.min(i, 8) * 40 + 'ms';
+      const top = document.createElement('div'); top.className = 'top';
+      const pl = document.createElement('span'); pl.className = 'place'; pl.textContent = '#' + (i + 1);
+      const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = b.name;
+      top.append(pl, nm);
+      if (it.id === state.me) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'Dein Auto'; t.style.marginLeft = 'auto'; top.append(t); }
+      const shot = document.createElement('div'); shot.className = 'shot';
+      const im = document.createElement('img'); im.src = b.img; im.alt = b.name; im.loading = 'lazy'; shot.append(im);
+      const by = document.createElement('div'); by.className = 'by'; by.textContent = `von ${b.nick}${b.company ? ' · ' + b.company : ''}${CLS[b.cls] ? ' · ' + CLS[b.cls] : ''}`;
+      const sp = document.createElement('div'); sp.className = 'specs';
+      [[b.ps, 'PS'], [b.t14.toFixed(2) + ' s', '1/4 Meile'], [b.style, 'Stil']].forEach(([v, l]) => { const d = document.createElement('div'); const bb = document.createElement('b'); bb.textContent = v; const s = document.createElement('span'); s.textContent = l; d.append(bb, s); sp.append(d); });
+      const foot = document.createElement('div'); foot.className = 'foot';
+      const lk = document.createElement('span'); lk.className = 'likes'; lk.textContent = '♥ ' + it.likes; lk.setAttribute('aria-label', it.likes + ' Stimmen');
+      foot.append(lk);
+      if (it.id !== state.me && state.me && !state.writeLocked) {
+        const on = !!myPicks[it.id], v = document.createElement('button'); v.className = 'vote' + (on ? ' on' : '');
+        v.textContent = on ? '♥ Gewählt' : '♡ Abstimmen'; v.setAttribute('aria-pressed', on ? 'true' : 'false');
+        v.addEventListener('click', () => toggleVote(it.id)); foot.append(v);
+      }
+      c.append(top, shot, by, sp, foot); grid.append(c);
+    });
+    // Bühne: das Auto mit den meisten Stimmen
+    const pod = $('#podium'); pod.textContent = '';
+    if (list.length) {
+      const w = list[0], im = document.createElement('img'); im.src = w.b.img; im.alt = w.b.name;
+      const tt = document.createElement('div'); tt.className = 'turntable';
+      const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = '1. Platz: ' + w.b.name;
+      const sm = document.createElement('small'); sm.textContent = `von ${w.b.nick} · ♥ ${w.likes}`; cap.append(sm);
+      pod.append(im, tt, cap);
+    } else { const e = document.createElement('div'); e.className = 'empty-stage'; e.textContent = 'Die Bühne wartet auf das erste Auto.'; pod.append(e); }
+  }
+
+  // ---------- Start: gemeinsamen Speicher verbinden ----------
+  async function start() {
+    const status = $('#status');
+    const [db, user] = await Promise.all([window.claude ? claude.use('db') : null, window.claude ? claude.use('user') : null]);
+    if (!db) { status.textContent = 'Die Show ist nur mit Anmeldung bei claude.ai sichtbar. Öffne den Link angemeldet.'; return; }
+    state.db = db; state.user = user;
+    state.me = user ? await user.id() : null;
+    const cw = user ? await user.can('data.write') : null;
+    if (cw === false) state.writeLocked = true;
+    if (!state.me) state.writeLocked = true;
+    let gotB = false, gotV = false;
+    const timer = setTimeout(() => { if (!gotB) status.textContent = 'Die Show ist gerade nicht erreichbar. Sie lädt, sobald die Verbindung steht.'; }, 10000);
+    const done = () => { if (gotB && gotV) { clearTimeout(timer); status.textContent = state.writeLocked ? 'Du schaust zu. Zum Ausstellen und Abstimmen brauchst du Mitwirkenden-Rechte für diese Seite.' : ''; status.hidden = !status.textContent; } };
+    db.collection('builds').onSnapshot(snap => {
+      state.builds = new Map(snap.docs.filter(d => d.exists).map(d => [d.id, d.data()]).filter(([, b]) => b && typeof b.img === 'string' && /^data:image\/png;base64,/.test(b.img)));
+      if (!snap.metadata.fromCache) gotB = true; done(); render();
+    }, () => { clearTimeout(timer); status.textContent = 'Die Show konnte nicht geladen werden. Lade die Seite später nochmals.'; });
+    db.collection('votes').onSnapshot(snap => {
+      state.votes = new Map(snap.docs.filter(d => d.exists).map(d => [d.id, d.data()]));
+      if (!snap.metadata.fromCache) gotV = true; done(); render();
+    }, () => {});
+    renderPreview();
+  }
+  render();
+  start();
+})();
+</script>
