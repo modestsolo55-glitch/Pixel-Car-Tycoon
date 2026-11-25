@@ -2,7 +2,7 @@
    Teil 10: Drag Race – Seitenansicht mit Parallax, Christmas Tree, Cockpit-HUD,
    Burnout, Kupplung, Schalten, NOS, Rauch & Flammen, KI-Gegner, Ergebnis
    ============================================================================= */
-const RW_ = 320, RH_ = 180, HUD_Y = 126, PPM = 18;   // Canvas-Grösse, HUD-Start, Pixel pro Meter
+let RW_ = 320; const RW0 = 320, RH_ = 180, HUD_Y = 126, PPM = 18;   // RW_ = sichtbare Szenenbreite (wird beim Cruise-Zoom grösser)   // Canvas-Grösse, HUD-Start, Pixel pro Meter
 const LANE_FAR = 91, LANE_NEAR = 121;                   // Boden-y der Spuren
 let RACE = null, AUD = null;
 
@@ -253,7 +253,7 @@ function preloadRace(R) {
 }
 function drawLoading(R, f) {
   const cv = $('#racecv'); if (!cv) return;
-  const ctx = hdCtx(cv);
+  const ctx = hdCtx(cv, R.cruise ? 3 : 2);
   ctx.drawImage(_raceBG.sky, 0, 0); ctx.drawImage(_raceBG.skyline, 0, 10);
   ctx.fillStyle = 'rgba(7,8,15,0.72)'; ctx.fillRect(0, 0, RW_, RH_);
   cxText(ctx, _raceBG.T.name.toUpperCase(), RW_ / 2, 62, '#ffcd75', 3, 'c', '#000');
@@ -348,6 +348,7 @@ function raceNos() {
 // ---------- Hauptschleife ----------
 function raceLoop(now) {
   const R = RACE; if (!R) return;
+  RW_ = RW0;
   R.raf = requestAnimationFrame(raceLoop);                 // zuerst neu anmelden: ein Fehler darf das Rennen nie einfrieren
   // Zeitschritt nie negativ (der Zeitstempel des ersten Bildes kann vor R.last liegen) und höchstens 50 ms
   const dt = clamp((now - R.last) / 1000, 0, 0.05) * photoFactor(R); R.last = Math.max(R.last, now);
@@ -480,20 +481,29 @@ function emitSmoke(who, amount, black) {
 // ---------- Zeichnen ----------
 function drawRace() {
   const R = RACE, cv = $('#racecv'); if (!cv) return;
-  const ctx = hdCtx(cv);
+  const ctx = hdCtx(cv, R.cruise ? 3 : 2);
   const pv = R.pv, ov = R.ov;
+  // Cruise-Zoom: mehr Strasse sichtbar (Szene wird verkleinert, Cockpit bleibt gleich)
+  const z = R.cruise ? (R.zoom || 1) : 1;
+  RW_ = Math.round(RW0 / z);
   // Kamera hängt beim Beschleunigen etwas nach und holt auf (Masse spürbar), beim Bremsen umgekehrt
-  const camX = pv.x - 170 / PPM - (pv.camOff || 0);
+  const camX = pv.x - (R.cruise ? RW_ * 0.34 : 170) / PPM - (pv.camOff || 0);
   const sh = R.shake > 0 && SET.shake ? Math.round((Math.random() - 0.5) * R.shake * 2) : 0;
   const shy = R.shake > 0 && SET.shake ? Math.round((Math.random() - 0.5) * R.shake) : 0;
   const W = (x) => Math.round((x - camX) * PPM * 2) / 2 + sh;      // halbe Pixel = 1 Bildschirmpixel → ruhiges Scrollen      // Welt -> Bildschirm
-  ctx.save(); ctx.translate(0, shy);
+  ctx.save();
+  if (z !== 1) {                                                        // Zoom um die Strassenunterkante
+    ctx.beginPath(); ctx.rect(0, 0, RW0, HUD_Y); ctx.clip();
+    ctx.fillStyle = `rgb(${_raceBG.T.skyTop.join(',')})`; ctx.fillRect(0, 0, RW0, HUD_Y);
+    ctx.translate(0, HUD_Y); ctx.scale(z, z); ctx.translate(0, -HUD_Y);
+  }
+  ctx.translate(0, shy);
   // Himmel & Parallax
-  ctx.drawImage(_raceBG.sky, 0, 0);
+  ctx.drawImage(_raceBG.sky, 0, 0, RW_, 80);
   drawFxSky(ctx, camX, R.t);
   { const TH = THEMES[_raceBG.T.scene]; if (TH && TH.landmark) { if (_raceBG.T.night) ctx.filter = 'brightness(0.4) saturate(0.75)'; TH.landmark(ctx, R.t); ctx.filter = 'none'; } }
-  const sl = -((camX * PPM * 0.05) % RW_);
-  ctx.drawImage(_raceBG.skyline, Math.round(sl), 10); ctx.drawImage(_raceBG.skyline, Math.round(sl) + RW_, 10);
+  const sl = -((camX * PPM * 0.05) % RW0);
+  for (let x = Math.round(sl); x < RW_; x += RW0) ctx.drawImage(_raceBG.skyline, x, 10);
   const st = _raceBG.T.town ? _raceBG.stands[_raceBG.T.night ? 1 : 0] : _raceBG.stands[Math.abs(Math.floor(R.t * 4)) % 2];
   const so = -((camX * PPM * 0.35) % 192);
   for (let x = Math.round(so) - 192; x < RW_; x += 192) ctx.drawImage(st, x, 34);
@@ -562,6 +572,8 @@ function drawRace() {
   drawFxLights(ctx, W, camX, R.t);
   drawFxFlare(ctx);
   ctx.restore();
+  RW_ = RW0;
+  if (R.cruise) { cruiseDrawOverlay(ctx); cruiseDrawRadar(ctx, z, camX); }
   if (!R.cruise) drawTreeHUD(ctx);
   drawHUD(ctx);
   // Meldungen

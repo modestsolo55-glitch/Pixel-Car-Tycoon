@@ -24,7 +24,8 @@ function startCruise() {
   R.pv.x = 0; R.pv.launched = true; R.pv.locked = false; R.ov.x = -1e6;
   R.inp.brake = false;
   const top = $('#race .rtop .hf'); if (top) top.textContent = `${m.name} · CRUISEN · ${_raceBG.T.name}`;
-  const q = $('#rquit'); if (q) q.textContent = 'Beenden';
+  const q = $('#rquit'); if (q) { q.textContent = 'Beenden'; q.insertAdjacentHTML('beforebegin', '<button class="btn sm gray" id="cr-zoom">Zoom</button>'); $('#cr-zoom').addEventListener('click', cruiseZoom); }
+  R.zoom = CRUISE_ZOOMS.includes(SET.cruiseZoom) ? SET.cruiseZoom : 0.85;
   const ctl = $('#race .rctl'); ctl.classList.add('cr');
   ctl.innerHTML = `<button class="rbtn shift" id="cr-up">SPUR ↑</button><button class="rbtn shift" id="cr-dn">SPUR ↓</button>
     <button class="rbtn clutch" data-hold="brake">BREMSE</button><button class="rbtn gas" data-hold="gas">GAS</button>
@@ -45,6 +46,44 @@ function startCruise() {
 }
 ACTIONS.cruise = () => startCruise();
 
+const CRUISE_ZOOMS = [1, 0.85, 0.72, 0.6];
+/** Zoom-Stufe wechseln (100 % → 75 % → 60 % → 50 %) */
+function cruiseZoom() {
+  const R = RACE; if (!R || !R.cruise) return;
+  const i = CRUISE_ZOOMS.indexOf(R.zoom);
+  R.zoom = CRUISE_ZOOMS[(i + 1) % CRUISE_ZOOMS.length];
+  SET.cruiseZoom = R.zoom; saveSettings();
+  raceMsg('ZOOM ' + Math.round(100 / R.zoom * 100) / 100 + 'X WEITER', '#73eff7', 1);
+}
+/** Warnschilder am Bildrand: nächstes Auto vor dir pro Spur mit Meterangabe, Polizei hinter dir */
+function cruiseDrawRadar(ctx, z, camX) {
+  const R = RACE, pv = R.pv;
+  const boxY = lane => (lane >= 0.5 ? 100 : 72);                                  // feste Höhen: oben / unten (bei jedem Zoom gut lesbar)
+  const cands = R.traffic.map(c => ({ lane: c.lane, d: c.x - c.len - pv.x, c, tag: '' }));
+  if (R.street && R.ov && R.ov.x > -1e5 && R.street.st !== 'race') cands.push({ lane: R.street.lane, d: R.ov.x - (R.sprites.o ? R.sprites.o.L / PPM : 4.5) - pv.x, tag: 'RIVALE ' });
+  for (const lane of [0, 1]) {
+    const near = cands.filter(o => o.lane === lane && o.d > -1 && o.d < 260).sort((a, b) => a.d - b.d)[0];
+    if (!near) continue;
+    const d = Math.max(0, Math.round(near.d)), same = Math.abs(R.laneF - lane) < 0.5;
+    const danger = same && d < 25, warn = same ? d < 60 : d < 25;
+    const col = danger ? (Math.floor(R.t * 8) % 2 ? '#ff4b55' : '#ffffff') : warn ? '#ffcd75' : '#a7f070';
+    const txt = near.tag + d + ' M', w = textW(txt) + 22, x = RW0 - w - 3, y = boxY(lane);
+    ctx.fillStyle = danger ? 'rgba(120,10,20,0.85)' : 'rgba(13,15,26,0.8)'; ctx.fillRect(x, y, w, 10);
+    ctx.fillStyle = col; ctx.fillRect(x, y, 2, 10);
+    ctx.beginPath(); ctx.moveTo(x + 6, y + 2); ctx.lineTo(x + 11, y + 5); ctx.lineTo(x + 6, y + 8); ctx.closePath(); ctx.fill();
+    cxText(ctx, txt, x + 14, y + 2, col, 1);
+    cxText(ctx, lane ? 'UNTEN' : 'OBEN', x + w - 1, y - 7, '#94b0c2', 1, 'r', '#000');
+    // Warnton, wenn du schnell auf ein Auto in deiner Spur zufährst
+    if (near.c && danger && pv.v - near.c.v > 3 && !near.c.warned) { near.c.warned = true; popSound(0.08, 1500); setTimeout(() => popSound(0.08, 1500), 120); }
+  }
+  if (R.police) {
+    const d = Math.max(0, Math.round(pv.x - R.police.x)), txt = 'POLIZEI ' + d + ' M', w = textW(txt) + 18, y = boxY(R.police.laneF);
+    ctx.fillStyle = 'rgba(13,15,26,0.85)'; ctx.fillRect(3, y, w, 10);
+    ctx.fillStyle = Math.floor(R.t * 4) % 2 ? '#41a6f6' : '#ff4b55'; ctx.fillRect(w + 1, y, 2, 10);
+    ctx.beginPath(); ctx.moveTo(10, y + 2); ctx.lineTo(5, y + 5); ctx.lineTo(10, y + 8); ctx.closePath(); ctx.fill();
+    cxText(ctx, txt, 13, y + 2, '#c8dcff', 1);
+  }
+}
 function cruiseLane(dir) { const R = RACE; if (!R || !R.cruise) return; const n = clamp(R.lane + dir, 0, 1); if (n !== R.lane) { R.lane = n; popSound(0.05, 1800); const v = R.pv; v.vR = (v.vR || 0) + 2.2; v.vF = (v.vF || 0) + 2.6; } }
 function cruiseAuto() {
   const R = RACE; if (!R || !R.cruise || R.pc.E.isEV) return;
@@ -76,6 +115,7 @@ function cruiseKey(e, down) {
   else if (k === '-' || k === 'q' || k === 'Q') cruiseShift(-1);
   else if (k === 'm' || k === 'M') cruiseAuto();
   else if (k === 'h' || k === 'H') cruiseHorn();
+  else if (k === 'z' || k === 'Z') cruiseZoom();
   else if (k === 'n' || k === 'N') raceNos();
   else if (k === 'Escape') endRace(true);
 }

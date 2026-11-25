@@ -158,7 +158,6 @@ function drawFxLights(ctx, W, camX, t) {
     const x = W(i * 40 + 20) + 1;
     fxLightPool(ctx, x, 85, 34, 7, '255,236,190', 0.16); fxLightPool(ctx, x, 112, 40, 9, '255,236,190', 0.12);
   }
-  if (R.cruise) cruiseDrawOverlay(ctx);
   if (SET.gfx === 'low') return;
   // Blitzlichter im Publikum (mehr bei Nacht und kurz vor dem Ziel)
   if (!T.town) {
@@ -173,7 +172,7 @@ function drawFxLights(ctx, W, camX, t) {
   // Hitzeflimmern über heissem Asphalt (Vulkan, Wüste)
   if (T.hot || T.mesa) {
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const cv = ctx.canvas, k = cv.width / RW_;
+    const cv = ctx.canvas, k = cv.width / RW0;
     for (let y = 60; y < 78; y += 1) { const off = Math.round(Math.sin(t * 7 + y * 0.9) * (y > 70 ? 1 : 0.6) * k * 0.5); if (off) ctx.drawImage(cv, 0, y * k, cv.width, k, off, y * k, cv.width, k); }
     ctx.restore();
   }
