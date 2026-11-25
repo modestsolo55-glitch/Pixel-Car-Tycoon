@@ -6,6 +6,10 @@
 const TRAFFIC_IDS = ['hatch3', 'hatch5', 'city', 'sedan', 'wagon', 'mpv', 'suv', 'offroad', 'coupe'];
 const TRAFFIC_COLS = ['#f4f4f4', '#1a1c2c', '#94b0c2', '#b13e53', '#3b5dc9', '#38b764', '#8a8e98', '#ef7d57', '#29366f'];
 const trafficAng = k => k / 4 * Math.PI * 2;
+// Drei Spuren: 0 = oben (hinten), 1 = Mitte, 2 = unten (vorne). Boden-y je Spur, Trennlinien dazwischen
+const CR_LANES = 3, CR_Y0 = 88, CR_DY = 16.5, CR_DIVIDERS = [91, 108];
+const laneY = f => CR_Y0 + CR_DY * f;
+const LANE_NAMES = ['OBEN', 'MITTE', 'UNTEN'];
 
 function startCruise() {
   const m = raceEntry(RSEL.modelId); if (!m) return;
@@ -19,7 +23,7 @@ function startCruise() {
   const pl = { design: m.design, engine: m.engine, name: m.name, brand: m.brand };
   startRace({ player: pl, opp: Object.assign({}, pl, { name: '', react: [0.2, 0.3], skill: 1 }), dist: 'mile', prize: 0, xp: 0, rep: 0, fee: 0, own: true, cruise: true, track: RSEL.track, tod: RSEL.tod });
   const R = RACE;
-  Object.assign(R, { D: 1e9, phase: 'cruise', traffic: [], tdesigns, lane: 1, laneF: 1, pY: LANE_NEAR, auto: true, vmax: 0, passed: 0, crashes: 0, nosRefill: 0, spawnT: 1 });
+  Object.assign(R, { D: 1e9, phase: 'cruise', traffic: [], tdesigns, lane: 1, laneF: 1, pY: laneY(1), auto: true, vmax: 0, passed: 0, crashes: 0, nosRefill: 0, spawnT: 1 });
   raceMsg('FREIE FAHRT!', '#a7f070', 3);
   R.pv.x = 0; R.pv.launched = true; R.pv.locked = false; R.ov.x = -1e6;
   R.inp.brake = false;
@@ -58,21 +62,21 @@ function cruiseZoom() {
 /** Warnschilder am Bildrand: nächstes Auto vor dir pro Spur mit Meterangabe, Polizei hinter dir */
 function cruiseDrawRadar(ctx, z, camX) {
   const R = RACE, pv = R.pv;
-  const boxY = lane => (lane >= 0.5 ? 100 : 72);                                  // feste Höhen: oben / unten (bei jedem Zoom gut lesbar)
+  const boxY = lane => 84 + 13 * clamp(Math.round(lane), 0, CR_LANES - 1);          // feste Zeilen je Spur (bei jedem Zoom gut lesbar, unter den Meldungen)
   const cands = R.traffic.map(c => ({ lane: c.lane, d: c.x - c.len - pv.x, c, tag: '' }));
   if (R.street && R.ov && R.ov.x > -1e5 && R.street.st !== 'race') cands.push({ lane: R.street.lane, d: R.ov.x - (R.sprites.o ? R.sprites.o.L / PPM : 4.5) - pv.x, tag: 'RIVALE ' });
-  for (const lane of [0, 1]) {
+  for (let lane = 0; lane < CR_LANES; lane++) {
     const near = cands.filter(o => o.lane === lane && o.d > -1 && o.d < 260).sort((a, b) => a.d - b.d)[0];
     if (!near) continue;
     const d = Math.max(0, Math.round(near.d)), same = Math.abs(R.laneF - lane) < 0.5;
     const danger = same && d < 25, warn = same ? d < 60 : d < 25;
     const col = danger ? (Math.floor(R.t * 8) % 2 ? '#ff4b55' : '#ffffff') : warn ? '#ffcd75' : '#a7f070';
-    const txt = near.tag + d + ' M', w = textW(txt) + 22, x = RW0 - w - 3, y = boxY(lane);
+    const txt = near.tag + d + ' M', lab = LANE_NAMES[lane], w = textW(txt) + textW(lab) + 26, x = RW0 - w - 3, y = boxY(lane);
     ctx.fillStyle = danger ? 'rgba(120,10,20,0.85)' : 'rgba(13,15,26,0.8)'; ctx.fillRect(x, y, w, 10);
     ctx.fillStyle = col; ctx.fillRect(x, y, 2, 10);
     ctx.beginPath(); ctx.moveTo(x + 6, y + 2); ctx.lineTo(x + 11, y + 5); ctx.lineTo(x + 6, y + 8); ctx.closePath(); ctx.fill();
     cxText(ctx, txt, x + 14, y + 2, col, 1);
-    cxText(ctx, lane ? 'UNTEN' : 'OBEN', x + w - 1, y - 7, '#94b0c2', 1, 'r', '#000');
+    cxText(ctx, lab, x + w - 3, y + 2, same ? '#f4f4f4' : '#6a7a90', 1, 'r');
     // Warnton, wenn du schnell auf ein Auto in deiner Spur zufährst
     if (near.c && danger && pv.v - near.c.v > 3 && !near.c.warned) { near.c.warned = true; popSound(0.08, 1500); setTimeout(() => popSound(0.08, 1500), 120); }
   }
@@ -84,7 +88,7 @@ function cruiseDrawRadar(ctx, z, camX) {
     cxText(ctx, txt, 13, y + 2, '#c8dcff', 1);
   }
 }
-function cruiseLane(dir) { const R = RACE; if (!R || !R.cruise) return; const n = clamp(R.lane + dir, 0, 1); if (n !== R.lane) { R.lane = n; popSound(0.05, 1800); const v = R.pv; v.vR = (v.vR || 0) + 2.2; v.vF = (v.vF || 0) + 2.6; } }
+function cruiseLane(dir) { const R = RACE; if (!R || !R.cruise) return; const n = clamp(R.lane + dir, 0, CR_LANES - 1); if (n !== R.lane) { R.lane = n; popSound(0.05, 1800); const v = R.pv; v.vR = (v.vR || 0) + 2.2; v.vF = (v.vF || 0) + 2.6; } }
 function cruiseAuto() {
   const R = RACE; if (!R || !R.cruise || R.pc.E.isEV) return;
   R.auto = !R.auto; const b = $('#cr-auto'); if (b) b.classList.toggle('on', R.auto);
@@ -137,8 +141,8 @@ function cruiseStep(dt) {
   }
   // weicher Spurwechsel
   R.laneV = (R.laneV || 0) + ((R.lane - R.laneF) * 34 - (R.laneV || 0) * 10) * dt;        // Spurwechsel mit Masse (S-Kurve)
-  R.laneF = clamp(R.laneF + R.laneV * dt, -0.08, 1.08);
-  R.pY = lerp(LANE_FAR, LANE_NEAR, R.laneF);
+  R.laneF = clamp(R.laneF + R.laneV * dt, -0.08, CR_LANES - 1 + 0.08);
+  R.pY = laneY(R.laneF);
   R.vmax = Math.max(R.vmax, pv.v * 3.6);
   // NOS füllt sich 20 s nach dem Verbrauch wieder auf
   if (R.pc.nos && pv.nosUsed && pv.nosT <= 0) { R.nosRefill += dt; if (R.nosRefill > 20) { pv.nosUsed = false; R.nosRefill = 0; raceMsg('NOS AUFGEFÜLLT', '#73eff7', 1.2); } }
@@ -159,13 +163,15 @@ function cruiseTraffic(dt) {
   }
   R.traffic = R.traffic.filter(c => c.x > pv.x - 40 && c.x < pv.x + 300);
   R.spawnT -= dt;
-  if (R.traffic.length < 4 && R.spawnT <= 0 && pv.v > 3 && !(R.street && ['count', 'race'].includes(R.street.st))) {
-    const lane = Math.random() < 0.5 ? 0 : 1, x = pv.x + rand(30, 70);
-    if (!R.traffic.some(c => c.lane === lane && Math.abs(c.x - x) < 18)) {
+  if (R.traffic.length < 6 && R.spawnT <= 0 && pv.v > 3 && !(R.street && ['count', 'race'].includes(R.street.st))) {
+    const lane = randi(0, CR_LANES - 1), x = pv.x + rand(30, 70);
+    // nie alle drei Spuren gleichzeitig zustellen, und nicht in die Spur des Herausforderers
+    const blocked = new Set(R.traffic.filter(c => c.lane !== lane && Math.abs(c.x - x) < 22).map(c => c.lane));
+    if (!R.traffic.some(c => c.lane === lane && Math.abs(c.x - x) < 18) && blocked.size < CR_LANES - 1 && !(R.street && R.street.lane === lane)) {
       const d = pick(R.tdesigns), s = renderCar(d, { angle: 0 });
       R.traffic.push({ x, lane, v: rand(12, 24), d, len: s.L / PPM, passed: false });
     }
-    R.spawnT = rand(1.2, 3.5);
+    R.spawnT = rand(0.9, 2.8);
   }
   for (const c of R.traffic) {
     const rear = c.x - c.len;
@@ -183,9 +189,9 @@ function cruiseTraffic(dt) {
 /** Autos nach Spur sortiert zeichnen (hintere Spur zuerst) */
 function cruiseDrawCars(ctx, W, camX, sh) {
   const R = RACE, items = [];
-  for (const c of R.traffic) items.push({ y: c.lane ? LANE_NEAR : LANE_FAR, f: () => {
+  for (const c of R.traffic) items.push({ y: laneY(c.lane), f: () => {
     const k = Math.floor((((c.x / 0.31) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / (Math.PI * 2) * 4) % 4;
-    const s = renderCar(c.d, { angle: trafficAng(k) }), gy = c.lane ? LANE_NEAR : LANE_FAR;
+    const s = renderCar(c.d, { angle: trafficAng(k) }), gy = Math.round(laneY(c.lane));
     const x0 = W(c.x) - (s.ox + s.L);
     if (x0 > RW_ + 10 || x0 + s.W < -10) return;
     if (_raceBG.T.night) ctx.filter = 'brightness(0.55) saturate(0.8)';

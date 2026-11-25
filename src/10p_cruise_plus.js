@@ -55,8 +55,9 @@ function streetStep(R, dt) {
       R.cfg.opp = { design: o.design, engine: o.engine, name: o.name, brand: o.brand, react: o.react, skill: o.skill };
       R.oc = computeCar(o.design, o.engine);
       const ov = R.ov = new Vehicle(R.oc); ov.launched = true; ov.locked = true; ov.x = pv.x - 14; ov.v = pv.v + 4; ov.gear = Math.max(1, pv.gear);
-      R.street = { st: 'approach', lane: 1 - R.lane, o, t: 0 };
-      R.traffic = R.traffic.filter(cc => cc.lane === R.lane);
+      const lane = R.lane === 1 ? pick([0, 2]) : 1;                              // Herausforderer kommt auf der Nachbarspur
+      R.street = { st: 'approach', lane, o, t: 0 };
+      R.traffic = R.traffic.filter(cc => cc.lane !== lane);
     }
     return;
   }
@@ -140,7 +141,6 @@ function sirenOn(on) {
 }
 
 // ---------- Zeichnen ----------
-const laneY = f => LANE_FAR + (LANE_NEAR - LANE_FAR) * f;
 /** zusätzliche Autos (Herausforderer, Polizei) in die Spur-Sortierung einreihen */
 function cruisePlusCars(items, ctx, W, camX, sh) {
   const R = RACE;
@@ -180,7 +180,7 @@ function cruiseDrawScenery(ctx, W) {
   if (s && s.target && (s.st === 'race' || s.st === 'leave')) {
     const fx = W(s.target);
     if (fx > -20 && fx < RW_ + 20) {
-      for (let y = 75; y < 124; y += 2) for (let k = 0; k < 3; k++) { if (y >= 95 && y < 98) continue; ctx.fillStyle = ((y >> 1) + k) % 2 ? '#f4f4f4' : '#1a1c2c'; ctx.fillRect(fx + k * 2, y, 2, 2); }
+      for (let y = 75; y < 124; y += 2) for (let k = 0; k < 3; k++) { ctx.fillStyle = ((y >> 1) + k) % 2 ? '#f4f4f4' : '#1a1c2c'; ctx.fillRect(fx + k * 2, y, 2, 2); }
       cxText(ctx, 'ZIEL', fx + 3, 64, '#ffcd75', 1, 'c', '#000');
     }
   }

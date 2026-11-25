@@ -82,7 +82,7 @@ function fxStep(R, dt) {
 /** Partikel einer Spur zeichnen */
 function drawSmoke(ctx, who, camX, sh) {
   const R = RACE;
-  const gy = who === 'p' ? (R.cruise ? Math.round(R.pY) : LANE_NEAR) : LANE_FAR;
+  const gy = who === 'p' ? (R.cruise ? Math.round(R.pY) : LANE_NEAR) : (R.cruise && R.street ? Math.round(laneY(R.street.lane)) : LANE_FAR);
   const night = !!(_raceBG && _raceBG.T.night);
   for (const p of R.parts) {
     if (p.who !== who) continue;

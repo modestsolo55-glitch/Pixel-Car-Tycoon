@@ -523,12 +523,19 @@ function drawRace() {
   for (let i = Math.floor(camX / 14); i < camX / 14 + RW_ / PPM / 14 + 1; i++) { const x = W(i * 14 + 6); for (let k = 0; k < 3; k++) { ctx.fillStyle = '#1e1e24'; ctx.fillRect(x, 72 - k * 3, 10, 3); ctx.fillStyle = k === 1 ? '#f4f4f4' : '#3a3a44'; ctx.fillRect(x, 72 - k * 3, 10, 1); } }
   // Fahrbahn
   const ao = -(((camX * PPM) % 64) + 64) % 64;
-  for (let x = Math.round(ao) + sh - 64; x < RW_; x += 64) { ctx.drawImage(_raceBG.asph, x, 75, 64, 20); ctx.drawImage(_raceBG.asph, x, 98, 64, 28); }
-  ctx.fillStyle = '#c8ccd4'; ctx.fillRect(0, 95, RW_, 2); ctx.fillStyle = '#7a8090'; ctx.fillRect(0, 97, RW_, 1);
+  if (R.cruise) {                                                       // Landstrasse: 3 Spuren, gestrichelte Trennlinien
+    for (let x = Math.round(ao) + sh - 64; x < RW_; x += 64) { ctx.drawImage(_raceBG.asph, x, 75, 64, 26); ctx.drawImage(_raceBG.asph, x, 100, 64, 26); }
+    for (const ly of CR_DIVIDERS) for (let i = Math.floor(camX / 6) - 1; i < camX / 6 + RW_ / PPM / 6 + 1; i++) {
+      const x = W(i * 6); ctx.fillStyle = '#e4e6ec'; ctx.fillRect(x, ly, 3 * PPM, 1); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x, ly + 1, 3 * PPM, 1);
+    }
+  } else {
+    for (let x = Math.round(ao) + sh - 64; x < RW_; x += 64) { ctx.drawImage(_raceBG.asph, x, 75, 64, 20); ctx.drawImage(_raceBG.asph, x, 98, 64, 28); }
+    ctx.fillStyle = '#c8ccd4'; ctx.fillRect(0, 95, RW_, 2); ctx.fillStyle = '#7a8090'; ctx.fillRect(0, 97, RW_, 1);
+  }
   for (let i = Math.floor(camX / 4); i < camX / 4 + RW_ / PPM / 4 + 1; i++) { ctx.fillStyle = '#e8d44d'; ctx.fillRect(W(i * 4), 124, 18, 1); }
   // Burnout-Box (nass) und Startlinie
-  ctx.fillStyle = 'rgba(20,30,50,0.45)'; ctx.fillRect(W(-16), 75, 11 * PPM, 20); ctx.fillRect(W(-16), 98, 11 * PPM, 26);
-  ctx.fillStyle = '#f4f4f4'; ctx.fillRect(W(0), 75, 2, 20); ctx.fillRect(W(0), 98, 2, 26);
+  if (!R.cruise) { ctx.fillStyle = 'rgba(20,30,50,0.45)'; ctx.fillRect(W(-16), 75, 11 * PPM, 20); ctx.fillRect(W(-16), 98, 11 * PPM, 26);
+  ctx.fillStyle = '#f4f4f4'; ctx.fillRect(W(0), 75, 2, 20); ctx.fillRect(W(0), 98, 2, 26); }
   // Ziel
   const fx = W(R.D);
   for (let y = 75; y < 124; y += 2) for (let k = 0; k < 3; k++) { if (y >= 95 && y < 98) continue; ctx.fillStyle = ((y >> 1) + k) % 2 ? '#f4f4f4' : '#1a1c2c'; ctx.fillRect(fx + k * 2, y, 2, 2); }
