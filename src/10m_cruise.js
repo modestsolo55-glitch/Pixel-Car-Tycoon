@@ -45,7 +45,7 @@ function startCruise() {
 }
 ACTIONS.cruise = () => startCruise();
 
-function cruiseLane(dir) { const R = RACE; if (!R || !R.cruise) return; const n = clamp(R.lane + dir, 0, 1); if (n !== R.lane) { R.lane = n; popSound(0.05, 1800); } }
+function cruiseLane(dir) { const R = RACE; if (!R || !R.cruise) return; const n = clamp(R.lane + dir, 0, 1); if (n !== R.lane) { R.lane = n; popSound(0.05, 1800); const v = R.pv; v.vR = (v.vR || 0) + 2.2; v.vF = (v.vF || 0) + 2.6; } }
 function cruiseAuto() {
   const R = RACE; if (!R || !R.cruise || R.pc.E.isEV) return;
   R.auto = !R.auto; const b = $('#cr-auto'); if (b) b.classList.toggle('on', R.auto);
@@ -86,7 +86,8 @@ function cruiseStep(dt) {
   R.shake = Math.max(0, R.shake - dt * 6);
   R.flame.p = Math.max(0, R.flame.p - dt);
   pv.step(dt, { thr: I.gas && !I.brake ? 1 : 0, clutch: false });
-  if (I.brake) pv.v = Math.max(0, pv.v - 9.5 * dt);
+  R.brakeF = clamp((R.brakeF || 0) + (I.brake ? dt * 4 : -dt * 8), 0, 1);                  // Bremsdruck baut sich auf
+  if (R.brakeF > 0) pv.v = Math.max(0, pv.v - 9.5 * R.brakeF * dt);
   else if (!I.gas) pv.v = Math.max(0, pv.v - 0.5 * dt);                        // Motorbremse
   // Automatik: hoch bei hoher Drehzahl, runter wenn der Motor zu tief dreht
   if (R.auto && !E.isEV && pv.shiftT <= 0) {
@@ -94,12 +95,14 @@ function cruiseStep(dt) {
     else if (pv.gear > 1 && pv.rpm < E.red * (I.gas ? 0.42 : 0.28)) pv.shiftDown();
   }
   // weicher Spurwechsel
-  R.laneF += clamp(R.lane - R.laneF, -dt * 2.4, dt * 2.4);
+  R.laneV = (R.laneV || 0) + ((R.lane - R.laneF) * 34 - (R.laneV || 0) * 10) * dt;        // Spurwechsel mit Masse (S-Kurve)
+  R.laneF = clamp(R.laneF + R.laneV * dt, -0.08, 1.08);
   R.pY = lerp(LANE_FAR, LANE_NEAR, R.laneF);
   R.vmax = Math.max(R.vmax, pv.v * 3.6);
   // NOS füllt sich 20 s nach dem Verbrauch wieder auf
   if (R.pc.nos && pv.nosUsed && pv.nosT <= 0) { R.nosRefill += dt; if (R.nosRefill > 20) { pv.nosUsed = false; R.nosRefill = 0; raceMsg('NOS AUFGEFÜLLT', '#73eff7', 1.2); } }
   cruiseTraffic(dt);
+  suspStep(pv, dt, { idle: pv.v < 0.5 && I.gas ? 0.4 : 0 });
   if (pv.slip > 0.25 && pv.v < 60) emitSmoke('p', pv.slip);
   for (const p of R.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; p.vx *= 0.98; }
   R.parts = R.parts.filter(p => p.life > 0);

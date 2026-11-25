@@ -241,7 +241,7 @@ function preloadRace(R) {
   const tick = () => {
     if (RACE !== R || R.manual) return;
     const t0 = performance.now();
-    while (jobs.length && performance.now() - t0 < 25) { const [who, a, br] = jobs.shift(); if (who === 'g') { renderCar(R.ghost.design, { angle: 0, brake: false, lights: false }); continue; } const [d, o] = raceCarArgs(R, who, a, br); renderCar(d, o); }
+    while (jobs.length && performance.now() - t0 < 25) { const [who, a, br] = jobs.shift(); if (who === 'g') { renderCar(R.ghost.design, { angle: 0, brake: false, lights: false }); continue; } const [d, o] = raceCarArgs(R, who, a, br); const Ly = carLayers(d, o); carWheelLayer(Ly, Math.round(a / (Math.PI * 2) * 16) % 16); }
     drawLoading(R, 1 - jobs.length / total);
     if (jobs.length) { R.loadTO = setTimeout(tick, 0); return; }
     R.hud = buildHUDLayer(R);
@@ -422,6 +422,7 @@ function raceStep(dt) {
     if (ov.slip > 0.25 && ov.v < 70) emitSmoke('o', ov.slip);
   }
   ghostRecord(R);
+  suspStep(pv, dt, { idle: !pv.launched && pv.rpm > pv.c.E.red * 0.5 ? pv.rpm / pv.c.E.red : 0 }); suspStep(ov, dt, { idle: !ov.launched && ov.rpm > ov.c.E.red * 0.5 ? 0.6 : 0 });
   for (const who of ['p', 'o']) {                                  // Gummi auf der Bahn, wo die Reifen durchdrehen
     const v = who === 'p' ? pv : ov, s = R.sprites[who];
     const spin = v.slip > 0.2 || (!v.launched && R.phase === 'prestage' && (who === 'p' ? I.burnout && I.gas : R.t > 0.6 && R.t < 3.2));
@@ -482,7 +483,8 @@ function drawRace() {
   const R = RACE, cv = $('#racecv'); if (!cv) return;
   const ctx = hdCtx(cv);
   const pv = R.pv, ov = R.ov;
-  const camX = pv.x - 170 / PPM;
+  // Kamera hängt beim Beschleunigen etwas nach und holt auf (Masse spürbar), beim Bremsen umgekehrt
+  const camX = pv.x - 170 / PPM - (pv.camOff || 0);
   const sh = R.shake > 0 && SET.shake ? Math.round((Math.random() - 0.5) * R.shake * 2) : 0;
   const shy = R.shake > 0 && SET.shake ? Math.round((Math.random() - 0.5) * R.shake) : 0;
   const W = (x) => Math.round((x - camX) * PPM) + sh;      // Welt -> Bildschirm
@@ -567,17 +569,25 @@ function drawRace() {
 function drawRaceCar(ctx, who, v, frontX, groundY) {
   const R = RACE;
   const a = (((v.wheelAng % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
-  const aq = Math.floor(a / (Math.PI * 2) * 16) / 16 * Math.PI * 2;
+  const k16 = Math.floor(a / (Math.PI * 2) * 16) % 16;
   const braking = !!(R.cruise ? R.inp.brake : (!v.launched || (who === 'p' ? R.p.fin : R.o.fin)));
-  const [d, opt] = raceCarArgs(R, who, aq, braking);
+  const [d, opt] = raceCarArgs(R, who, k16 / 16 * Math.PI * 2, braking);
   const night = opt.lights;
-  const s = renderCar(d, opt);
+  const s = carLayers(d, opt);
   R.sprites[who] = s;
-  const vib = !v.launched && v.rpm > v.c.E.red * 0.55 && Math.floor(R.t * 36) % 2 ? 0.5 : 0;   // Motor schüttelt das Auto im Stand
   const x0 = frontX - (s.ox + s.L), y0 = groundY - s.gy;
   if (x0 > RW_ + 10 || x0 + s.W < -10) return;
   drawChute(ctx, who === 'p' ? R.p : R.o, v, x0 + s.ox, groundY);
-  ctx.drawImage(s.cv, x0, y0 - vib, s.W, s.H);
+  // Räder (bei hohem Tempo verwischt, damit sie nicht „rückwärts“ flackern)
+  const spin = (v.v / RW + (v.slip > 0.1 ? v.slip * 40 : 0)) / 60;             // Radumdrehung pro Bild
+  ctx.drawImage(carWheelLayer(s, k16), x0, y0, s.W, s.H);
+  if (spin > 0.18) { ctx.globalAlpha = 0.5; ctx.drawImage(carWheelLayer(s, (k16 + 1) % 16), x0, y0, s.W, s.H); if (spin > 0.45) { ctx.globalAlpha = 0.33; ctx.drawImage(carWheelLayer(s, (k16 + 2) % 16), x0, y0, s.W, s.H); } ctx.globalAlpha = 1; }
+  // Karosserie federt: hinten/vorne getrennt (in Streifen gezeichnet → leichtes Nicken)
+  drawBodySprung(ctx, s, v, x0, y0, night);
+  if (braking && v.v > 0.5 && (R.cruise || (who === 'p' ? R.p.fin : R.o.fin))) {                       // Bremslicht-Schein
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gx = x0 + s.ox, gyy = groundY - s.tailY - (v.zR || 0);
+    const g = ctx.createRadialGradient(gx, gyy, 0, gx, gyy, 12); g.addColorStop(0, 'rgba(255,40,60,0.55)'); g.addColorStop(1, 'rgba(255,40,60,0)'); ctx.fillStyle = g; ctx.fillRect(gx - 12, gyy - 12, 24, 24); ctx.restore();
+  }
   sprayEmit(R, who, v, s, x0, y0);
   // Spiegelung auf nasser Fahrbahn
   if (_raceBG.T.wet) {
@@ -590,7 +600,7 @@ function drawRaceCar(ctx, who, v, frontX, groundY) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(lightCone('head'), hx, hy - 16, 70, 32); ctx.restore();
   }
   // Abgasflammen (Schalten) & NOS
-  const ex = x0 + s.exhaust.x, ey = y0 + s.exhaust.y;
+  const ex = x0 + s.exhaust.x, ey = y0 + s.exhaust.y + (v.zR || 0);
   const fl = who === 'p' ? R.flame.p : R.flame.o;
   if (fl > 0 || (v.limiterT > 0.05 && Math.random() > 0.6)) {
     const len = 4 + Math.round(Math.random() * 5);
@@ -601,6 +611,52 @@ function drawRaceCar(ctx, who, v, frontX, groundY) {
     for (let i = 0; i < len; i++) { ctx.fillStyle = i < 3 ? '#ffffff' : i < 8 ? '#73eff7' : '#3b5dc9'; ctx.fillRect(ex - i, ey - 1 + Math.round(Math.random() * 1.2), 1, i < 6 ? 3 : 2); }
     // Geschwindigkeitslinien
     if (who === 'p') for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(244,244,244,0.5)'; ctx.fillRect(Math.round(Math.random() * RW_), 60 + Math.round(Math.random() * 60), 14, 1); }
+  }
+  // Fahrtwind-Linien ab hohem Tempo (dezent)
+  if (who === 'p' && v.v > 45 && !v.nosT) { const n = Math.min(5, (v.v - 45) / 10); for (let i = 0; i < n; i++) { ctx.fillStyle = 'rgba(244,244,244,0.18)'; ctx.fillRect(Math.round(Math.random() * RW_), 50 + Math.round(Math.random() * 74), 10 + Math.round(v.v / 8), 1); } }
+}
+
+/** Federung pro Auto: Feder-Dämpfer hinten und vorne, angeregt von Beschleunigung, Bremsen, Schalten und Fahrbahn */
+function suspStep(v, dt, extra) {
+  if (v.zR == null) { v.zR = v.zF = v.vR = v.vF = 0; v.aS = 0; v.pv = v.v; }
+  const aRaw = dt > 0 ? (v.v - v.pv) / dt : 0; v.pv = v.v;
+  v.aS += (clamp(aRaw, -14, 14) - v.aS) * clamp(dt * 10, 0, 1);                   // geglättete Längsbeschleunigung
+  const A = v.aS;
+  // Gas: hinten geht in die Knie, vorne kaum hoch · Bremsen: vorne taucht ein, hinten kommt etwas hoch
+  const tR = A >= 0 ? clamp(A * 0.2, 0, 1.4) : clamp(A * 0.06, -0.7, 0);
+  const tF = A >= 0 ? clamp(-A * 0.04, -0.4, 0) : clamp(-A * 0.17, 0, 1.6);
+  const K = 85, C = 8.5;
+  v.vR += (K * (tR - v.zR) - C * v.vR) * dt; v.zR += v.vR * dt;
+  v.vF += (K * (tF - v.zF) - C * v.vF) * dt; v.zF += v.vF * dt;
+  // Fahrbahn: feine Unebenheiten ab Tempo, Motor schüttelt im Stand
+  if (v.v > 8) { const n = Math.min(1, v.v / 70) * 22 * dt; v.vR += (Math.random() - 0.5) * n; v.vF += (Math.random() - 0.5) * n; }
+  if (extra && extra.idle) { const n = extra.idle * 30 * dt; v.vR += (Math.random() - 0.5) * n; v.vF += (Math.random() - 0.5) * n; }
+  v.zR = clamp(v.zR, -1.4, 2.2); v.zF = clamp(v.zF, -1.2, 2.5);
+  // Kamera-Trägheit (Meter): eilt beim Beschleunigen nach, beim Bremsen vor
+  const camT = clamp(A * 0.26, -2.4, 2.2);
+  v.camOff = (v.camOff || 0) + (camT - (v.camOff || 0)) * clamp(dt * 2.2, 0, 1);
+}
+/** Karosserie in senkrechten Streifen zeichnen – jeder Streifen um die Federung hinten/vorne verschoben; dazu wandernde Lack-Spiegelung */
+let _bodyFx = null;
+function drawBodySprung(ctx, s, v, x0, y0, night) {
+  const cv = s.bodyCv, Q = s.k, wr = s.wheels[0].x, wf = s.wheels[1].x;
+  // Spiegelung: heller Streifen gleitet beim Fahren über den Lack (nur auf Karosseriepixeln)
+  if (!_bodyFx) _bodyFx = document.createElement('canvas');
+  const fx = _bodyFx; if (fx.width !== cv.width || fx.height !== cv.height) { fx.width = cv.width; fx.height = cv.height; }
+  const c = fx.getContext('2d'); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, fx.width, fx.height); c.drawImage(cv, 0, 0);
+  c.globalCompositeOperation = 'source-atop';
+  const per = fx.width * 1.6, ph = ((-(v.x || 0) * PPM * Q * (night ? 1.4 : 0.8)) % per + per) % per - fx.width * 0.3;
+  const g = c.createLinearGradient(ph, 0, ph + fx.height * 0.9, fx.height);
+  const al = night ? 0.22 : 0.13;
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.45, `rgba(255,255,255,${al})`); g.addColorStop(0.55, `rgba(255,255,255,${al})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, fx.width, fx.height);
+  const zR = v.zR || 0, zF = v.zF || 0, N = 12, sw = Math.ceil(cv.width / N);
+  for (let i = 0; i < N; i++) {
+    const sx = i * sw; if (sx >= cv.width) break;
+    const cx = (sx + sw / 2) / Q, u = (cx - wr) / Math.max(1, wf - wr);
+    const dy = Math.round((zR + (zF - zR) * u) * 2) / 2;                                  // halbe Spielpixel = 1 Bildschirmpixel
+    const w = Math.min(sw + 1, cv.width - sx);
+    ctx.drawImage(fx, sx, 0, w, cv.height, x0 + sx / Q, y0 + dy, w / Q, cv.height / Q);
   }
 }
 

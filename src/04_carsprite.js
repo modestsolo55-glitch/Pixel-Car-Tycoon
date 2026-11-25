@@ -47,6 +47,27 @@ const _spriteCache = new Map();
  * opt: { angle: Radrotation, lights: Scheinwerfer an, brake: Bremslicht, exh: Auspuffart, brand: Text für Sponsor }
  * Rückgabe: { pb, cv, W, H, ox, gy, L, wheels:[{x,y,r}], exhaust:{x,y}, mask }
  */
+/** Rennen: Auto als zwei Ebenen – Karosserie (kann federn) und Räder mit Radhäusern und Schatten (pro Radstellung) */
+const _layerCache = new Map();
+function carLayers(d, opt = {}) {
+  const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.paint, d.rim, d.rimColor, d.tire, d.spoiler, d.lip, d.skirts, d.diffuser,
+    d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.interior && d.interior.seatColor, d.wear || 0, opt.lights, opt.brake, opt.exh, opt.brand, opt.sc || CAR_SC]);
+  let L = _layerCache.get(key);
+  if (L) return L;
+  const s = drawCarSprite(d, Object.assign({}, opt, { angle: 0, layers: true }));
+  L = Object.assign({}, s, { wheelCv: [] });
+  if (_layerCache.size > 40) _layerCache.delete(_layerCache.keys().next().value);
+  _layerCache.set(key, L);
+  return L;
+}
+/** Räder-Ebene für Radstellung k (0..15) */
+function carWheelLayer(L, k) {
+  if (L.wheelCv[k]) return L.wheelCv[k];
+  const sp = L.spec, pb = new PB(sp.W, sp.H); pb.d.set(sp.wellD);
+  const zero = sp.zero || (sp.zero = new Uint8Array(sp.W * sp.H));
+  for (const w of sp.wheels) drawWheel(pb, w.cx, w.cy, sp.R, sp.rimR, sp.rimRGB, sp.rim, k / 16 * Math.PI * 2, zero, sp.W, sp.Q);
+  return (L.wheelCv[k] = pb.canvas());
+}
 function renderCar(d, opt = {}) {
   const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.paint, d.rim, d.rimColor, d.tire, d.spoiler, d.lip, d.skirts, d.diffuser,
     d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.interior && d.interior.seatColor, d.wear || 0, opt.angle ? Math.round(opt.angle * 8 / Math.PI) : 0, opt.lights, opt.brake, opt.exh, opt.brand, opt.sc || CAR_SC]);
@@ -653,12 +674,25 @@ function drawCarSprite(d, opt) {
     const gf = d.glow && d.glow !== 'none' && !nearW ? 0.25 : 1;      // Neon überstrahlt den Schatten
     for (let t = 0; t < Q; t++) { pb.blend(ox + x, gy + t, Chex('#000000'), (nearW ? 0.55 : 0.38) * gf); pb.blend(ox + x, gy + Q + t, Chex('#000000'), (nearW ? 0.3 : 0.18) * gf); }
   }
+  // Ebenen fürs Rennen trennen: alles am Boden (Radhäuser, Räder, Schatten, Neon) bleibt stehen, die Karosserie federt
+  let layers = null;
+  if (opt.layers) {
+    const body = new PB(W, H), well = new Uint32Array(W * H);
+    for (let i = 0; i < W * H; i++) {
+      const c = pb.d[i]; if (!c) continue;
+      const m = mask[i];
+      if (m === M_WHEEL) continue;
+      if (m === M_WELL || ((i / W) | 0) >= gy) well[i] = c; else body.d[i] = c;
+    }
+    layers = { bodyCv: body.canvas(), spec: { W, H, Q, R, rimR, rimRGB, rim: d.rim, wellD: well, wheels: wheels.map(w => ({ cx: ox + w.x, cy: gy - w.y })) } };
+  }
   const cv = pb.canvas(), iq = 1 / Q;
   const logical = a => { const n = Math.ceil(L / Q), o = new Float32Array(n); for (let i = 0; i < n; i++) o[i] = a[Math.min(L - 1, i * Q)] / Q; return o; };
   // Masse in logischen Pixeln (Sprite-Canvas ist Q-mal so gross: beim Zeichnen Zielgrösse W x H angeben)
   return { pb, cv, k: Q, W: W * iq, H: H * iq, ox: ox * iq, gy: gy * iq, L: L * iq, R: R * iq,
     wheels: wheels.map(w => ({ x: (ox + w.x) * iq, y: (gy - w.y) * iq, r: R * iq })), exhaust: { x: (ox - 2 * Q) * iq, y: row(exK) * iq },
-    mask, beltY: beltY * iq, top: Q === 1 ? top : logical(top), bot: Q === 1 ? bot : logical(bot), by: by * iq };
+    mask, beltY: beltY * iq, top: Q === 1 ? top : logical(top), bot: Q === 1 ? bot : logical(bot), by: by * iq,
+    bodyCv: layers && layers.bodyCv, spec: layers && layers.spec, tailY: (gy - row(Math.floor((B.tail[1] || 12 * Q) + by)) ) * iq };
 }
 
 /** Rad zeichnen: Reifen mit Profilkante, Felge nach Design, Bremsscheibe und Bremssattel */
