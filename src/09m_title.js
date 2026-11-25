@@ -7,7 +7,7 @@
 
 // ---------- Einstellungen (gelten für alle Konten in diesem Browser) ----------
 const SET_KEY = 'at_settings';
-const SET = (() => { let s = {}; try { s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; } catch (e) { s = {}; } return Object.assign({ shake: true, ui: 100, startSpeed: 1 }, s); })();
+const SET = (() => { let s = {}; try { s = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {}; } catch (e) { s = {}; } return Object.assign({ shake: true, ui: 100, startSpeed: 1, music: true, musicVol: 0.5, gfx: 'high' }, s); })();
 function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(SET)); } catch (e) { /* egal */ } }
 function applySettings() { document.body.style.zoom = SET.ui === 100 ? '' : String(SET.ui / 100); }
 const raceMuted = () => { try { return localStorage.getItem('at_mute') === '1'; } catch (e) { return false; } };
@@ -18,6 +18,9 @@ function settingsHTML(inGame) {
   const opt = (act, cur, list) => `<div class="opts" style="margin:0">${list.map(([v, l]) => `<button class="btn sm ${String(cur) === String(v) ? 'sel' : ''}" data-act="${act}" data-v="${v}">${l}</button>`).join('')}</div>`;
   return `<h2 class="title">${ico('gear', 'big')} Einstellungen</h2>
     ${row('Soundeffekte', 'Klicks, Kasse, Level-Aufstieg', tog('setSfx', SFX.on))}
+    ${row('Musik', 'Eigene Pixel-Musik: ruhig im Menü, treibend beim Cruisen, spannend im Rennen', tog('setMusic', SET.music !== false))}
+    ${row('Musik-Lautstärke', '', opt('setMusicVol', SET.musicVol, [[0.25, 'Leise'], [0.5, 'Mittel'], [0.75, 'Laut'], [1, 'Voll']]))}
+    ${row('Grafik', 'Niedrig: weniger Rauch, keine Spiegelungen und Licht-Effekte – für ältere Handys', opt('setGfx', SET.gfx, [['high', 'Hoch'], ['low', 'Niedrig']]))}
     ${row('Motorsound im Rennen', 'Motor, Turbo, NOS und Hupe beim Fahren', tog('setRaceSnd', !raceMuted()))}
     ${row('Kamera wackelt', 'Bildschirm-Wackeln bei Start, Schalten und NOS', tog('setShake', SET.shake))}
     ${row('Kino-Modus bei Pause', 'Nach 60 s ohne Eingabe zeigt die Kamera dein Auto', tog('setCinema', cinemaOn()))}
@@ -29,6 +32,9 @@ function settingsHTML(inGame) {
 const _setRefresh = () => { if ($('#title') && !$('#title').classList.contains('hidden') && $('#ttl-panel')) $('#ttl-panel').innerHTML = settingsHTML(false); else if (!$('#modal').classList.contains('hidden')) openModal(settingsHTML(true), true); };
 ACTIONS.setSfx = () => { SFX.on = !SFX.on; try { localStorage.setItem('at_sfx', SFX.on ? '1' : '0'); } catch (e) { /* egal */ } if (SFX.on) sfx('good'); _setRefresh(); };
 ACTIONS.setRaceSnd = () => { try { localStorage.setItem('at_mute', raceMuted() ? '0' : '1'); } catch (e) { /* egal */ } _setRefresh(); };
+ACTIONS.setMusic = () => { SET.music = SET.music === false; saveSettings(); _setRefresh(); };
+ACTIONS.setMusicVol = d => { SET.musicVol = +d.v; saveSettings(); _setRefresh(); };
+ACTIONS.setGfx = d => { SET.gfx = d.v === 'low' ? 'low' : 'high'; saveSettings(); _setRefresh(); };
 ACTIONS.setShake = () => { SET.shake = !SET.shake; saveSettings(); _setRefresh(); };
 ACTIONS.setCinema = () => { try { localStorage.setItem('at_cinema', cinemaOn() ? '0' : '1'); } catch (e) { /* egal */ } _setRefresh(); };
 ACTIONS.setUi = d => { SET.ui = +d.v; saveSettings(); applySettings(); _setRefresh(); };

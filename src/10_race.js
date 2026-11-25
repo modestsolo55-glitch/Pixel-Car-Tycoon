@@ -535,7 +535,7 @@ function drawRace() {
   }
   if (_raceBG.T.wet) drawWetRoad(ctx, W, camX);
   { const TH = THEMES[_raceBG.T.scene]; if (TH && TH.front) { if (NIGHT) ctx.filter = 'brightness(0.55) saturate(0.85)'; TH.front(ctx, W, camX, R.t); ctx.filter = 'none'; } }
-  if (!R.cruise) { drawRubber(ctx, W, camX); drawScoreboard(ctx, W(R.D + 70)); }
+  if (!R.cruise) { drawRubber(ctx, W, camX); drawScoreboard(ctx, W(R.D + 70)); } else cruiseDrawScenery(ctx, W);
   // Autos
   if (R.cruise) cruiseDrawCars(ctx, W, camX, sh);
   else {
@@ -572,7 +572,7 @@ function drawRaceCar(ctx, who, v, frontX, groundY) {
   const R = RACE;
   const a = (((v.wheelAng % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2));
   const k16 = Math.floor(a / (Math.PI * 2) * 16) % 16;
-  const braking = !!(R.cruise ? R.inp.brake : (!v.launched || (who === 'p' ? R.p.fin : R.o.fin)));
+  const braking = !!(R.cruise ? (who === 'p' && R.inp.brake) : (!v.launched || (who === 'p' ? R.p.fin : R.o.fin)));
   const [d, opt] = raceCarArgs(R, who, k16 / 16 * Math.PI * 2, braking);
   const night = opt.lights;
   const s = carLayers(d, opt);
@@ -583,7 +583,7 @@ function drawRaceCar(ctx, who, v, frontX, groundY) {
   // Räder (bei hohem Tempo verwischt, damit sie nicht „rückwärts“ flackern)
   const spin = (v.v / RW + (v.slip > 0.1 ? v.slip * 40 : 0)) / 60;             // Radumdrehung pro Bild
   ctx.drawImage(carWheelLayer(s, k16), x0, y0, s.W, s.H);
-  if (spin > 0.18) { ctx.globalAlpha = 0.5; ctx.drawImage(carWheelLayer(s, (k16 + 1) % 16), x0, y0, s.W, s.H); if (spin > 0.45) { ctx.globalAlpha = 0.33; ctx.drawImage(carWheelLayer(s, (k16 + 2) % 16), x0, y0, s.W, s.H); } ctx.globalAlpha = 1; }
+  if (spin > 0.18 && SET.gfx !== 'low') { ctx.globalAlpha = 0.5; ctx.drawImage(carWheelLayer(s, (k16 + 1) % 16), x0, y0, s.W, s.H); if (spin > 0.45) { ctx.globalAlpha = 0.33; ctx.drawImage(carWheelLayer(s, (k16 + 2) % 16), x0, y0, s.W, s.H); } ctx.globalAlpha = 1; }
   // Karosserie federt: hinten/vorne getrennt (in Streifen gezeichnet → leichtes Nicken)
   drawBodySprung(ctx, s, v, x0, y0, night);
   if (braking && v.v > 0.5 && (R.cruise || (who === 'p' ? R.p.fin : R.o.fin))) {                       // Bremslicht-Schein
@@ -616,7 +616,7 @@ function drawRaceCar(ctx, who, v, frontX, groundY) {
     if (who === 'p') for (let i = 0; i < 6; i++) { ctx.fillStyle = 'rgba(244,244,244,0.5)'; ctx.fillRect(Math.round(Math.random() * RW_), 60 + Math.round(Math.random() * 60), 14, 1); }
   }
   // Fahrtwind-Linien ab hohem Tempo (dezent)
-  if (who === 'p' && v.v > 45 && !v.nosT) { const n = Math.min(5, (v.v - 45) / 10); for (let i = 0; i < n; i++) { ctx.fillStyle = 'rgba(244,244,244,0.18)'; ctx.fillRect(Math.round(Math.random() * RW_), 50 + Math.round(Math.random() * 74), 10 + Math.round(v.v / 8), 1); } }
+  if (who === 'p' && v.v > 45 && !v.nosT && SET.gfx !== 'low') { const n = Math.min(5, (v.v - 45) / 10); for (let i = 0; i < n; i++) { ctx.fillStyle = 'rgba(244,244,244,0.18)'; ctx.fillRect(Math.round(Math.random() * RW_), 50 + Math.round(Math.random() * 74), 10 + Math.round(v.v / 8), 1); } }
 }
 
 /** Federung pro Auto: Feder-Dämpfer hinten und vorne, angeregt von Beschleunigung, Bremsen, Schalten und Fahrbahn */
@@ -642,6 +642,7 @@ function suspStep(v, dt, extra) {
 let _bodyFx = null;
 function drawBodySprung(ctx, s, v, x0, y0, night) {
   const cv = s.bodyCv, Q = s.k, wr = s.wheels[0].x, wf = s.wheels[1].x;
+  if (SET.gfx === 'low') { ctx.drawImage(cv, x0, y0 + Math.round(((v.zR || 0) + (v.zF || 0))) / 2, s.W, s.H); return; }   // Grafik niedrig: ohne Spiegelung und Nicken
   // Spiegelung: heller Streifen gleitet beim Fahren über den Lack (nur auf Karosseriepixeln)
   if (!_bodyFx) _bodyFx = document.createElement('canvas');
   const fx = _bodyFx; if (fx.width !== cv.width || fx.height !== cv.height) { fx.width = cv.width; fx.height = cv.height; }
@@ -843,6 +844,7 @@ function showRaceResult() {
     if (o) { o.cond = Math.max(5, o.cond - 15); svSyncWear(o); }
   }
   const leagueTxt = cfg.league ? leagueAfterRace(cfg, p, o) : '';
+  const careerTxt = careerAfterRace(cfg, win);
   const ghostTxt = ghostSave(R), wearTxt = wearAfter(R), mg = finishMargin(R);
   if (typeof chalEvent === 'function') chalEvent('race', { win, R });
   checkAchievements();
@@ -857,7 +859,7 @@ function showRaceResult() {
     ${timeslipHTML(R, win, mg)}
     <div class="hint" style="margin:4px">0–100 km/h: ${fmt(p.t100)} · Perfekte Schaltvorgänge: ${perf}/${p.shifts.length}${p.launchQ ? ' · Start: ' + ({ perfect: 'perfekt', high: 'zu viel Gas', low: 'zu wenig Drehzahl' })[p.launchQ] : ''}</div>
     ${cfg.oppId && OPP_INFO[cfg.oppId] ? `<div class="flex" style="margin:8px 4px">${faceImg(cfg.oppId, 40)}<i>„${esc(oppQuote(cfg.oppId, win ? 'lose' : 'win'))}“</i></div>` : ''}
-    <div style="margin:10px 4px">Gewinner: <b>${win ? 'Du (' + esc(cfg.player.name) + ')' : esc(cfg.opp.name)}</b>${reward}${ghostTxt}${wearTxt}</div>${leagueTxt}
+    <div style="margin:10px 4px">Gewinner: <b>${win ? 'Du (' + esc(cfg.player.name) + ')' : esc(cfg.opp.name)}</b>${reward}${ghostTxt}${wearTxt}</div>${leagueTxt}${careerTxt}
     <div class="flex"><button class="btn green ${cfg.league ? 'hidden' : ''}" id="rr-again">Nochmal${cfg.fee ? ' (' + fmtMoney(cfg.fee) + ')' : ''}</button><button class="btn gray" id="rr-back">Zurück</button></div></div>`;
   $('#race').appendChild(box);
   $('#rr-back').onclick = () => endRace(false);
@@ -870,6 +872,7 @@ function showRaceResult() {
 
 function endRace(quit, silent) {
   const R = RACE; if (!R) return;
+  if (typeof sirenOn === 'function') sirenOn(false);
   cancelAnimationFrame(R.raf); clearTimeout(R.loadTO);
   if (R.cruise) { const km = R.pv.x / 1000; if (km >= 0.5) addXP(Math.min(150, Math.round(km * 12))); toast(`${ico('car')} Cruise beendet: ${km.toFixed(1)} km · Spitze ${Math.round(R.vmax || 0)} km/h · ${R.passed || 0} überholt${R.crashes ? ' · ' + R.crashes + '× angestossen' : ''}`, 'good', 5000); }
   else if (quit && !R.resultShown) { S.stats.races++; toast('Rennen aufgegeben.', 'bad'); }

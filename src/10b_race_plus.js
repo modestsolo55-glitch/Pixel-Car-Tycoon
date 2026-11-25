@@ -245,9 +245,10 @@ function audioUpdate() {
   voiceUpdate(R.snd.p, R.pv, R.inp.gas ? 1 : 0.1, m, now);
   const near = clamp(1 - Math.abs(R.ov.x - R.pv.x) / 60, 0.15, 1);
   voiceUpdate(R.snd.o, R.ov, R.ov.launched && !R.o.fin ? 1 : 0.3, m, now);
-  R.snd.o.out.gain.setTargetAtTime(m || R.cruise ? 0 : R.snd.o.vol * near, now, 0.1);
+  R.snd.o.out.gain.setTargetAtTime(m || (R.cruise && !(R.street && R.ov.x > -1e5)) ? 0 : R.snd.o.vol * near, now, 0.1);
   R.snd.ng.gain.setTargetAtTime(!m && (R.pv.nosT > 0 || R.ov.nosT > 0) ? 0.05 : 0, now, 0.05);
   if (R.pv.limiterT > 0.05 && Math.random() < 0.08) popSound(0.12, 500);
+  if (typeof engineExtras === 'function') engineExtras();
 }
 function audioStop() {
   const R = RACE; if (!R || !R.snd) return;

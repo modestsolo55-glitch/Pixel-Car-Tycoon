@@ -112,7 +112,7 @@ TABS.design = {
         </div>
         <div class="panel"><h3>${ico('star')}Lack</h3>
           <div class="lbl">Lackfarbe</div>${swatches('dset', 'color', PAINT_COLORS, d.color, 'dcolor')}
-          <div class="lbl">Lackart</div>${optBtns('dset', 'paint', Object.entries(PAINTS).map(([k, p]) => [k, p.name, p.tech]), d.paint)}
+          <div class="lbl">Lackart</div>${optBtns('dset', 'paint', Object.entries(PAINTS).filter(([, p]) => !p.career || (S.career && S.career.gold)).map(([k, p]) => [k, p.name, p.tech]), d.paint)}
           <div class="lbl">Streifen / Zweifarbig</div>${optBtns('dset', 'stripe', Object.entries(STRIPES).map(([k, p]) => [k, p.name]), d.stripe)}
           <div class="lbl">Zweitfarbe</div>${swatches('dset', 'color2', PAINT_COLORS, d.color2, 'dcolor')}
         </div>
@@ -145,6 +145,7 @@ TABS.design = {
           <div class="flex"><span class="lbl" style="margin:0">Nummer (0 = keine)</span><input type="number" min="0" max="99" value="${d.number}" data-inp="dnum" style="width:80px"></div>
           ${optBtns('dset', 'numStyle', [['circle', 'Kreis'], ['box', 'Box']], d.numStyle)}
           <div class="lbl">Aufkleber</div>${optBtns('dset', 'sticker', Object.entries(STICKERS).map(([k, p]) => [k, p.name]), d.sticker)}
+          <div class="lbl">Eigener Aufkleber (Pixel-Editor)</div><div class="opts"><button class="btn sm yellow" data-act="decalEdit">${ico('star')} ${decalOf(d) ? 'Aufkleber bearbeiten' : 'Aufkleber malen'}</button>${decalOf(d) ? '<button class="btn sm gray" data-act="decRemove">Entfernen</button>' : ''}</div>
         </div>
       </div>
     </div>`;

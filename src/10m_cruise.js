@@ -57,6 +57,7 @@ function cruiseShift(dir) {
   raceShift(dir);
 }
 function cruiseHorn() {
+  if (streetAccept()) raceMsg('RENNEN ANGENOMMEN!', '#a7f070', 1);
   if (!AUD || !RACE || RACE.muted) return;
   try {
     const now = AUD.currentTime, g = AUD.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.06, now + 0.02); g.gain.setValueAtTime(0.06, now + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.38); g.connect(AUD.destination);
@@ -102,6 +103,7 @@ function cruiseStep(dt) {
   // NOS füllt sich 20 s nach dem Verbrauch wieder auf
   if (R.pc.nos && pv.nosUsed && pv.nosT <= 0) { R.nosRefill += dt; if (R.nosRefill > 20) { pv.nosUsed = false; R.nosRefill = 0; raceMsg('NOS AUFGEFÜLLT', '#73eff7', 1.2); } }
   cruiseTraffic(dt);
+  cruisePlusStep(dt);
   suspStep(pv, dt, { idle: pv.v < 0.5 && I.gas ? 0.4 : 0 });
   if (pv.slip > 0.25 && pv.v < 60) emitSmoke('p', pv.slip);
   fxStep(R, dt);
@@ -117,7 +119,7 @@ function cruiseTraffic(dt) {
   }
   R.traffic = R.traffic.filter(c => c.x > pv.x - 40 && c.x < pv.x + 300);
   R.spawnT -= dt;
-  if (R.traffic.length < 4 && R.spawnT <= 0 && pv.v > 3) {
+  if (R.traffic.length < 4 && R.spawnT <= 0 && pv.v > 3 && !(R.street && ['count', 'race'].includes(R.street.st))) {
     const lane = Math.random() < 0.5 ? 0 : 1, x = pv.x + rand(30, 70);
     if (!R.traffic.some(c => c.lane === lane && Math.abs(c.x - x) < 18)) {
       const d = pick(R.tdesigns), s = renderCar(d, { angle: 0 });
@@ -151,5 +153,6 @@ function cruiseDrawCars(ctx, W, camX, sh) {
     if (_raceBG.T.night || _raceBG.T.lights) { ctx.fillStyle = 'rgba(255,60,80,0.8)'; ctx.fillRect(x0 + s.ox - 1, gy - 7, 2, 2); }
   } });
   items.push({ y: R.pY + 0.01, f: () => { drawRaceCar(ctx, 'p', R.pv, W(R.pv.x), Math.round(R.pY * 2) / 2); drawSmoke(ctx, 'p', camX, sh); } });
+  cruisePlusCars(items, ctx, W, camX, sh);
   items.sort((a, b) => a.y - b.y).forEach(i => i.f());
 }

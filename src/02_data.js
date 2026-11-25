@@ -131,7 +131,8 @@ const PAINTS = {
   satin:    { name: 'Seidenmatt', cost: 900,  style: 7,  tech: null },
   candy:    { name: 'Candy',      cost: 2500, style: 12, tech: 'ch_metallic' },
   carbon:   { name: 'Carbon-Folie', cost: 4000, style: 13, tech: 'ch_metallic' },
-  chameleon:{ name: 'Chamäleon',  cost: 9000, style: 18, tech: 'ch_chrome' }
+  chameleon:{ name: 'Chamäleon',  cost: 9000, style: 18, tech: 'ch_chrome' },
+  gold:     { name: 'Champion-Gold', cost: 0, style: 24, tech: null, career: true }
 };
 const STRIPES = {
   none: { name: 'Keine' }, side: { name: 'Seitenstreifen' }, double: { name: 'Doppelstreifen' },

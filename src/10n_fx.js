@@ -29,7 +29,7 @@ function fxBlob(kind, v) {
 function fxTireSmoke(who, amount) {
   const R = RACE, v = who === 'p' ? R.pv : R.ov, s = R.sprites[who];
   if (!s) return;
-  const n = amount >= 1.5 ? 2 : Math.random() < amount * 0.7 ? 1 : 0;
+  const n = (amount >= 1.5 ? 2 : Math.random() < amount * 0.7 ? 1 : 0) * (SET.gfx === 'low' && Math.random() < 0.5 ? 0 : 1);
   const relX = (s.wheels[0].x - (s.ox + s.L)) / PPM;
   for (let i = 0; i < n; i++) R.parts.push({ who, kind: 'smoke', v: randi(0, 3), x: v.x + relX + rand(-0.3, 0.3), y: rand(-3, 0), vx: -rand(0.5, 4) - v.v * 0.12, vy: -rand(3, 10), r: rand(2.5, 4.5), grow: rand(5, 9), life: rand(1.4, 2.6), max: 2.6 });
   if (amount > 0.4 && Math.random() < 0.25) R.parts.push({ who, kind: 'debris', x: v.x + relX, y: -1, vx: -rand(2, 8), vy: -rand(40, 90), life: 0.8, max: 0.8 });
@@ -66,7 +66,7 @@ function fxStep(R, dt) {
   for (const p of R.parts) fxUpdate(p, dt);
   R.parts = R.parts.filter(p => p.life > 0);
   if (R.parts.length > FX_PART_MAX) R.parts.splice(0, R.parts.length - FX_PART_MAX);
-  for (const who of R.cruise ? ['p'] : ['p', 'o']) {
+  for (const who of R.cruise ? (R.street ? ['p', 'o'] : ['p']) : ['p', 'o']) {
     const v = who === 'p' ? R.pv : R.ov;
     if (!R.sprites[who]) continue;
     const gas = who === 'p' ? R.inp.gas : v.launched;
@@ -119,7 +119,7 @@ function fxCloud(i, col) {
 /** ziehende Wolken, funkelnde Sterne, Sonnen-Reflexe – direkt nach dem Himmel zeichnen */
 function drawFxSky(ctx, camX, t) {
   const T = _raceBG.T;
-  if (T.cloud && !T.night) for (let i = 0; i < 4; i++) {
+  if (T.cloud && !T.night && SET.gfx !== 'low') for (let i = 0; i < 4; i++) {
     const w = 60 + i * 8, sp = 2 + i * 1.3, x = ((i * 97 - t * sp - camX * PPM * 0.015) % (RW_ + w) + RW_ + w) % (RW_ + w) - w;
     ctx.globalAlpha = 0.85; ctx.drawImage(fxCloud(i, T.cloud), Math.round(x), 4 + (i * 9) % 24, w, w * 22 / 60); ctx.globalAlpha = 1;
   }
@@ -133,7 +133,7 @@ function drawFxSky(ctx, camX, t) {
 /** Sonnen-Reflexe (Linsen-Lichter) über der ganzen Szene */
 function drawFxFlare(ctx) {
   const T = _raceBG.T;
-  if (T.night || !T.sun) return;
+  if (T.night || !T.sun || SET.gfx === 'low') return;
   const [sx, sy] = T.sun, cx = RW_ / 2, cy = 80;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   [[0.35, 5, 'rgba(255,220,150,0.10)'], [0.6, 3, 'rgba(160,220,255,0.10)'], [0.85, 8, 'rgba(255,180,120,0.06)'], [1.2, 4, 'rgba(200,255,200,0.07)']].forEach(([k, r, c]) => {
@@ -158,6 +158,8 @@ function drawFxLights(ctx, W, camX, t) {
     const x = W(i * 40 + 20) + 1;
     fxLightPool(ctx, x, 85, 34, 7, '255,236,190', 0.16); fxLightPool(ctx, x, 112, 40, 9, '255,236,190', 0.12);
   }
+  if (R.cruise) cruiseDrawOverlay(ctx);
+  if (SET.gfx === 'low') return;
   // Blitzlichter im Publikum (mehr bei Nacht und kurz vor dem Ziel)
   if (!T.town) {
     const near = R.cruise ? 0 : clamp(1 - Math.abs(R.D - R.pv.x) / 120, 0, 1);

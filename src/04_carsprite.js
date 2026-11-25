@@ -51,7 +51,7 @@ const _spriteCache = new Map();
 const _layerCache = new Map();
 function carLayers(d, opt = {}) {
   const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.paint, d.rim, d.rimColor, d.tire, d.spoiler, d.lip, d.skirts, d.diffuser,
-    d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.interior && d.interior.seatColor, d.wear || 0, opt.lights, opt.brake, opt.exh, opt.brand, opt.sc || CAR_SC]);
+    d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.interior && d.interior.seatColor, d.wear || 0, opt.lights, opt.brake, opt.exh, opt.brand, opt.sc || CAR_SC, d.decal || '']);
   let L = _layerCache.get(key);
   if (L) return L;
   const s = drawCarSprite(d, Object.assign({}, opt, { angle: 0, layers: true }));
@@ -70,7 +70,7 @@ function carWheelLayer(L, k) {
 }
 function renderCar(d, opt = {}) {
   const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.paint, d.rim, d.rimColor, d.tire, d.spoiler, d.lip, d.skirts, d.diffuser,
-    d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.interior && d.interior.seatColor, d.wear || 0, opt.angle ? Math.round(opt.angle * 8 / Math.PI) : 0, opt.lights, opt.brake, opt.exh, opt.brand, opt.sc || CAR_SC]);
+    d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.interior && d.interior.seatColor, d.wear || 0, opt.angle ? Math.round(opt.angle * 8 / Math.PI) : 0, opt.lights, opt.brake, opt.exh, opt.brand, opt.sc || CAR_SC, d.decal || '']);
   if (_spriteCache.has(key)) return _spriteCache.get(key);
   const out = drawCarSprite(d, opt);
   if (_spriteCache.size > 260) _spriteCache.delete(_spriteCache.keys().next().value);
@@ -126,6 +126,12 @@ function drawCarSprite(d, opt) {
       else if (f > 0.5) c = [58, 63, 80]; else if (f > 0.3) c = shadeRGB(tint, -0.35); else c = mixRGB(tint, [200, 184, 160], 0.4);
       if (lvl <= 1) c = shadeRGB(c, -0.35); if (lvl >= 5) c = [255, 255, 255];
       return c;
+    }
+    if (paint === 'gold') {                              // Champion-Gold: Goldflitter, leicht in Lackfarbe
+      const base = mixRGB(rgb, [214, 168, 58], 0.78);
+      let cc = shadeRGB(base, SHADE[lvl] * 1.1 + (lvl >= 4 ? 0.08 : 0));
+      if (hash2(x * 3 + 1, k * 7) > 0.97) cc = shadeRGB(cc, 0.45);
+      return cc;
     }
     if (paint === 'carbon') {                            // Carbon-Folie: Köperbindung, leicht in Lackfarbe getönt
       const w = ((Math.floor(x / Q) + Math.floor(k / Q)) & 3) < 2, base = mixRGB([34, 35, 42], rgb, 0.12);
@@ -509,6 +515,7 @@ function drawCarSprite(d, opt) {
     const cx = ox - 3 * Q, cy = row(20 * Q + by);
     pb.disc(cx, cy, 5.5 * Q, Chex('#1e1e24')); pb.ring(cx, cy, 4.2 * Q, 5.5 * Q, Chex('#2c2c34')); pb.disc(cx, cy, 3 * Q, Chex(d.rimColor)); pb.disc(cx, cy, 1.2 * Q, Chex('#1e1e24'));
   }
+  drawDecalOn(d, put, mAt, B, bot, beltY, Q);                         // eigener Pixel-Aufkleber
   // ---------- 5a) Zusatzdetails: Sicke, Stossfänger-Fugen, Tankdeckel, Dachreling, Antenne ----------
   const shadePx = (x, k, f) => { if (mAt(x, k) !== M_BODY) return; const sx = ox + x, sy = row(k), u = unC(pb.d[sy * W + sx]); pb.d[sy * W + sx] = Crgb(shadeRGB([u[0], u[1], u[2]], f)); };
   // Charakterlinie (Sicke) über die ganze Flanke: dunkle Kante, darüber Glanz
@@ -799,7 +806,7 @@ function drawWheel(pbOut, cx, cy, R, rimR, rimRGB, design, angle, mask, W, Q = 1
 /** Halb so grosses Mini-Sprite (z. B. für das Fliessband) */
 const _miniCache = new Map();
 function miniCar(d) {
-  const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.rim, d.rimColor, d.spoiler, d.wear || 0]);
+  const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.rim, d.rimColor, d.spoiler, d.wear || 0, d.decal || '', d.paint, d.sticker]);
   if (_miniCache.has(key)) return _miniCache.get(key);
   const s = renderCar(d);
   const cv = document.createElement('canvas'); cv.width = Math.ceil(s.W / 2); cv.height = Math.ceil(s.H / 2);
@@ -812,7 +819,7 @@ function miniCar(d) {
 /** Vorschau-Bild eines Modells als Data-URL (für Listen) */
 const _thumbCache = new Map();
 function carThumbURL(d, brand) {
-  const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.paint, d.rim, d.rimColor, d.tire, d.spoiler, d.lip, d.skirts, d.diffuser, d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.wear || 0, brand || '']);
+  const key = JSON.stringify([d.body, d.color, d.color2, d.stripe, d.paint, d.rim, d.rimColor, d.tire, d.spoiler, d.lip, d.skirts, d.diffuser, d.ride, d.tint, d.number, d.numStyle, d.sticker, d.kit, d.glow, d.banner, d.wear || 0, brand || '', d.decal || '']);
   const hit = _thumbCache.get(key); if (hit) return hit;
   const url = carThumbURLRaw(d, brand);
   if (_thumbCache.size > 300) _thumbCache.delete(_thumbCache.keys().next().value);

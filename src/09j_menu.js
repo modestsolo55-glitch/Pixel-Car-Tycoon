@@ -13,7 +13,7 @@ const NAV = [
   { id: 'garage',   title: 'Garage',       icon: 'car',      tabs: ['design', 'interior', 'engine', 'tuning'], sub: ['Karosserie', 'Innenraum', 'Motor', 'Tuning'] },
   { id: 'company',  title: 'Firma',        icon: 'factory',  tabs: ['factory', 'models', 'market'], sub: ['Fabrik', 'Modelle & Preise', 'Verkauf & Werbung'] },
   { id: 'research', title: 'Forschung',    icon: 'research', tabs: ['research'] },
-  { id: 'racing',   title: 'Rennen',       icon: 'race',     tabs: ['race', 'league'], sub: ['Drag Race', 'Liga'] },
+  { id: 'racing',   title: 'Rennen',       icon: 'race',     tabs: ['race', 'career', 'league'], sub: ['Drag Race', 'Karriere', 'Liga'] },
   { id: 'show',     title: 'Autoshow',     icon: 'star',     tabs: ['show'] },
   { id: 'salvage',  title: 'Schrottplatz', icon: 'magnet',   tabs: ['salvage'] },
   { id: 'goals',    title: 'Ziele',        icon: 'trophy',   tabs: ['ach'] },
