@@ -91,7 +91,7 @@ function cruiseStep(dt) {
   else if (!I.gas) pv.v = Math.max(0, pv.v - 0.5 * dt);                        // Motorbremse
   // Automatik: hoch bei hoher Drehzahl, runter wenn der Motor zu tief dreht
   if (R.auto && !E.isEV && pv.shiftT <= 0) {
-    if (I.gas && pv.rpm >= E.red * 0.92 && pv.gear < E.ratios.length) { pv.shiftUp(); R.flame.p = 0.1; if (E.ind === 'turbo' || E.ind === 'twin') blowOff(); }
+    if (I.gas && pv.rpm >= E.red * 0.92 && pv.gear < E.ratios.length) { pv.shiftUp(); R.flame.p = 0.1; fxExhaust('p', 'pop'); if (E.ind === 'turbo' || E.ind === 'twin') blowOff(); }
     else if (pv.gear > 1 && pv.rpm < E.red * (I.gas ? 0.42 : 0.28)) pv.shiftDown();
   }
   // weicher Spurwechsel
@@ -104,9 +104,7 @@ function cruiseStep(dt) {
   cruiseTraffic(dt);
   suspStep(pv, dt, { idle: pv.v < 0.5 && I.gas ? 0.4 : 0 });
   if (pv.slip > 0.25 && pv.v < 60) emitSmoke('p', pv.slip);
-  for (const p of R.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; p.vx *= 0.98; }
-  R.parts = R.parts.filter(p => p.life > 0);
-  if (R.parts.length > 260) R.parts.splice(0, R.parts.length - 260);
+  fxStep(R, dt);
 }
 
 /** Verkehr: langsamere Autos auf beiden Spuren, die man überholen kann */
@@ -152,6 +150,6 @@ function cruiseDrawCars(ctx, W, camX, sh) {
     ctx.drawImage(s.cv, x0, gy - s.gy, s.W, s.H); ctx.filter = 'none';
     if (_raceBG.T.night || _raceBG.T.lights) { ctx.fillStyle = 'rgba(255,60,80,0.8)'; ctx.fillRect(x0 + s.ox - 1, gy - 7, 2, 2); }
   } });
-  items.push({ y: R.pY + 0.01, f: () => { drawRaceCar(ctx, 'p', R.pv, W(R.pv.x), Math.round(R.pY)); drawSmoke(ctx, 'p', camX, sh); } });
+  items.push({ y: R.pY + 0.01, f: () => { drawRaceCar(ctx, 'p', R.pv, W(R.pv.x), Math.round(R.pY * 2) / 2); drawSmoke(ctx, 'p', camX, sh); } });
   items.sort((a, b) => a.y - b.y).forEach(i => i.f());
 }

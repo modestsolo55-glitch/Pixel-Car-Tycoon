@@ -333,7 +333,7 @@ function raceShift(dir) {
   if (dir > 0) {
     const q = R.pv.shiftUp();
     if (!q) return;
-    R.flame.p = 0.14; R.shake = Math.max(R.shake, 1); popSound(0.16, 650);
+    R.flame.p = 0.14; R.shake = Math.max(R.shake, 1); popSound(0.16, 650); fxExhaust('p', 'pop');
     if (R.pc.E.ind === 'turbo' || R.pc.E.ind === 'twin') blowOff();
     R.p.shifts.push(q);
     const M = { perfect: ['PERFEKT!', '#a7f070'], good: ['GUT', '#73eff7'], early: ['ZU FRÜH', '#ffcd75'], late: ['ZU SPÄT!', '#ef7d57'] }[q];
@@ -416,7 +416,7 @@ function raceStep(dt) {
     if (R.o.fin) { ov.step(dt, { thr: 0, clutch: true }); ov.v = Math.max(0, ov.v - (chuteOpen(R.o) ? 13 : 7) * dt); }
     else {
       ov.step(dt, { thr: ov.slip > 0.3 ? 0.8 : 1, clutch: false });
-      if (!ov.c.E.isEV && ov.rpm >= ov.c.E.red * ai.shiftU && ov.shiftT <= 0 && ov.gear < ov.c.E.ratios.length) { ov.shiftUp(); R.flame.o = 0.14; }
+      if (!ov.c.E.isEV && ov.rpm >= ov.c.E.red * ai.shiftU && ov.shiftT <= 0 && ov.gear < ov.c.E.ratios.length) { ov.shiftUp(); R.flame.o = 0.14; fxExhaust('o', 'pop'); }
       if (ov.c.nos && !ov.nosUsed && R.t - R.o.launchT > ai.nosAt) ov.fireNos();
     }
     if (ov.slip > 0.25 && ov.v < 70) emitSmoke('o', ov.slip);
@@ -440,11 +440,10 @@ function raceStep(dt) {
     if (!rec.t14 && v.x >= 402.34) { rec.t14 = el; rec.v14 = v.v * 3.6; }
     if (v.x >= R.D) { rec.et = el; rec.fin = R.t; rec.trap = v.v * 3.6; if (rec.trap > 230) rec.chuteT = R.t + 0.35; }
   }
-  if (R.p.fin && !R.p.announced) { R.p.announced = true; const win = playerWins(); raceMsg(win ? 'SIEG!' : 'NIEDERLAGE', win ? '#a7f070' : '#ff4b55', 5); }
+  if (R.p.fin && !R.p.announced) { R.p.announced = true; const win = playerWins(); raceMsg(win ? 'SIEG!' : 'NIEDERLAGE', win ? '#a7f070' : '#ff4b55', 5); if (win) R.fwT = 3; }
   // Partikel
-  for (const p of R.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += dt * 6; p.vx *= 0.98; }
-  R.parts = R.parts.filter(p => p.life > 0);
-  if (R.parts.length > 260) R.parts.splice(0, R.parts.length - 260);
+  if (R.fwT > 0) { R.fwT -= dt; if (Math.random() < dt * 3.5) fxFirework(); }
+  fxStep(R, dt);
   // Ende?
   const pDone = R.p.fin || (R.p.foul && R.t - R.p.launchT > 2.5) || (R.p.blown && R.t - R.p.blowT > 2.5);
   const oDone = R.o.fin || R.o.foul || R.t - R.greenT > 120;
@@ -475,7 +474,7 @@ function emitSmoke(who, amount, black) {
   const relX = (wr.x - (s.ox + s.L)) / PPM;               // Hinterrad relativ zur Front (m)
   // schwarzer Rauch aus dem Motorraum (Motorschaden)
   if (black) { R.parts.push({ who, x: v.x - s.L / PPM * 0.15, y: -rand(10, 16), vx: -rand(1, 3) - v.v * 0.3, vy: -rand(3, 8), r: rand(2, 4), life: rand(1, 2), max: 2, col: '#2a2b33' }); return; }
-  R.parts.push({ who, x: v.x + relX + rand(-0.2, 0.2), y: rand(-2, 0), vx: -rand(1, 5) - v.v * 0.2, vy: -rand(4, 12), r: rand(2, 4), life: rand(0.9, 1.8), max: 1.8 });
+  void relX; fxTireSmoke(who, amount);
 }
 
 // ---------- Zeichnen ----------
@@ -487,10 +486,11 @@ function drawRace() {
   const camX = pv.x - 170 / PPM - (pv.camOff || 0);
   const sh = R.shake > 0 && SET.shake ? Math.round((Math.random() - 0.5) * R.shake * 2) : 0;
   const shy = R.shake > 0 && SET.shake ? Math.round((Math.random() - 0.5) * R.shake) : 0;
-  const W = (x) => Math.round((x - camX) * PPM) + sh;      // Welt -> Bildschirm
+  const W = (x) => Math.round((x - camX) * PPM * 2) / 2 + sh;      // halbe Pixel = 1 Bildschirmpixel → ruhiges Scrollen      // Welt -> Bildschirm
   ctx.save(); ctx.translate(0, shy);
   // Himmel & Parallax
   ctx.drawImage(_raceBG.sky, 0, 0);
+  drawFxSky(ctx, camX, R.t);
   { const TH = THEMES[_raceBG.T.scene]; if (TH && TH.landmark) { if (_raceBG.T.night) ctx.filter = 'brightness(0.4) saturate(0.75)'; TH.landmark(ctx, R.t); ctx.filter = 'none'; } }
   const sl = -((camX * PPM * 0.05) % RW_);
   ctx.drawImage(_raceBG.skyline, Math.round(sl), 10); ctx.drawImage(_raceBG.skyline, Math.round(sl) + RW_, 10);
@@ -559,6 +559,8 @@ function drawRace() {
   const gap = ov.x - pv.x;
   if (!R.cruise && Math.abs(gap) > 7 && pv.launched) cxText(ctx, (gap > 0 ? '>> ' : '<< ') + Math.abs(gap).toFixed(1) + 'M', gap > 0 ? RW_ - 4 : 4, 80, gap > 0 ? '#ff7b8a' : '#a7f070', 1, gap > 0 ? 'r' : 'l', '#000');
   drawWeather(ctx, camX);
+  drawFxLights(ctx, W, camX, R.t);
+  drawFxFlare(ctx);
   ctx.restore();
   if (!R.cruise) drawTreeHUD(ctx);
   drawHUD(ctx);
@@ -598,6 +600,7 @@ function drawRaceCar(ctx, who, v, frontX, groundY) {
   if (night) {
     const hx = frontX, hy = y0 + s.gy - Math.round(BODIES[d.body].head[1] + (d.ride | 0) + 1);
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(lightCone('head'), hx, hy - 16, 70, 32); ctx.restore();
+    fxLightPool(ctx, hx + 34, groundY - 1, 38, 5, '255,244,200', 0.24);                    // Lichtpfütze auf der Strasse
   }
   // Abgasflammen (Schalten) & NOS
   const ex = x0 + s.exhaust.x, ey = y0 + s.exhaust.y + (v.zR || 0);
@@ -629,12 +632,11 @@ function suspStep(v, dt, extra) {
   v.vR += (K * (tR - v.zR) - C * v.vR) * dt; v.zR += v.vR * dt;
   v.vF += (K * (tF - v.zF) - C * v.vF) * dt; v.zF += v.vF * dt;
   // Fahrbahn: feine Unebenheiten ab Tempo, Motor schüttelt im Stand
-  if (v.v > 8) { const n = Math.min(1, v.v / 70) * 22 * dt; v.vR += (Math.random() - 0.5) * n; v.vF += (Math.random() - 0.5) * n; }
-  if (extra && extra.idle) { const n = extra.idle * 30 * dt; v.vR += (Math.random() - 0.5) * n; v.vF += (Math.random() - 0.5) * n; }
+  if (extra && extra.idle) { const n = extra.idle * 14 * dt; v.vR += (Math.random() - 0.5) * n; v.vF += (Math.random() - 0.5) * n; }   // nur Motorschütteln im Stand
   v.zR = clamp(v.zR, -1.4, 2.2); v.zF = clamp(v.zF, -1.2, 2.5);
   // Kamera-Trägheit (Meter): eilt beim Beschleunigen nach, beim Bremsen vor
-  const camT = clamp(A * 0.26, -2.4, 2.2);
-  v.camOff = (v.camOff || 0) + (camT - (v.camOff || 0)) * clamp(dt * 2.2, 0, 1);
+  const camT = clamp(A * 0.16, -1.3, 1.2);
+  v.camOff = (v.camOff || 0) + (camT - (v.camOff || 0)) * clamp(dt * 1.3, 0, 1);
 }
 /** Karosserie in senkrechten Streifen zeichnen – jeder Streifen um die Federung hinten/vorne verschoben; dazu wandernde Lack-Spiegelung */
 let _bodyFx = null;
@@ -650,14 +652,12 @@ function drawBodySprung(ctx, s, v, x0, y0, night) {
   const al = night ? 0.22 : 0.13;
   g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.45, `rgba(255,255,255,${al})`); g.addColorStop(0.55, `rgba(255,255,255,${al})`); g.addColorStop(1, 'rgba(255,255,255,0)');
   c.fillStyle = g; c.fillRect(0, 0, fx.width, fx.height);
-  const zR = v.zR || 0, zF = v.zF || 0, N = 12, sw = Math.ceil(cv.width / N);
-  for (let i = 0; i < N; i++) {
-    const sx = i * sw; if (sx >= cv.width) break;
-    const cx = (sx + sw / 2) / Q, u = (cx - wr) / Math.max(1, wf - wr);
-    const dy = Math.round((zR + (zF - zR) * u) * 2) / 2;                                  // halbe Spielpixel = 1 Bildschirmpixel
-    const w = Math.min(sw + 1, cv.width - sx);
-    ctx.drawImage(fx, sx, 0, w, cv.height, x0 + sx / Q, y0 + dy, w / Q, cv.height / Q);
-  }
+  const hq = (z, prev) => { const q = Math.round(z * 2) / 2; return prev != null && Math.abs(z - prev) < 0.4 ? prev : q; };   // Hysterese
+  v.qR = hq(v.zR || 0, v.qR); v.qF = hq(v.zF || 0, v.qF);
+  const qM = Math.round((v.qR + v.qF)) / 2;
+  const cut1 = Math.round((wr + (wf - wr) * 0.33) * Q), cut2 = Math.round((wr + (wf - wr) * 0.67) * Q);
+  const seg = [[0, cut1, v.qR], [cut1, cut2, qM], [cut2, cv.width, v.qF]];
+  for (const [a, b, dy] of seg) if (b > a) ctx.drawImage(fx, a, 0, b - a, cv.height, x0 + a / Q, y0 + dy, (b - a) / Q, cv.height / Q);
 }
 
 /** Lichtkegel (Flutlicht / Scheinwerfer) – einmal gezeichnet, dann nur kopiert */
@@ -675,19 +675,6 @@ function lightCone(kind) {
   return (_coneCache[kind] = cv);
 }
 
-function drawSmoke(ctx, who, camX, sh) {
-  const R = RACE;
-  const gy = who === 'p' ? (R.cruise ? Math.round(R.pY) : LANE_NEAR) : LANE_FAR;
-  for (const p of R.parts) {
-    if (p.who !== who) continue;
-    const x = Math.round((p.x - camX) * PPM) + sh, y = gy - 3 + p.y;
-    const a = clamp(p.life / p.max, 0, 1);
-    ctx.globalAlpha = a * 0.75;
-    ctxDisc(ctx, x, y, p.r, p.col || (a > 0.6 ? '#f4f4f4' : '#c8ccd4'));
-    ctx.globalAlpha = a * 0.4; ctxDisc(ctx, x + 1, y + 1, p.r * 0.7, p.col ? '#14151c' : '#94b0c2');
-  }
-  ctx.globalAlpha = 1;
-}
 
 /** Zustand der Startampel */
 function treeState() {
